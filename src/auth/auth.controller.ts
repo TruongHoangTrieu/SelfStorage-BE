@@ -38,6 +38,13 @@ export class AuthController {
     return user;
   }
 
+  @UseGuards(JwtAuthGuard)
+  @Post('logout')
+  @HttpCode(HttpStatus.OK)
+  async logout(@CurrentUser() user: any) {
+    return this.authService.logout(user.id);
+  }
+
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.STORAGE_CUSTOMER)
   @Get('test/customer')

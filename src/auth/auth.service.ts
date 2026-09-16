@@ -92,4 +92,11 @@ export class AuthService {
       user: this.usersService.sanitizeUser(user),
     };
   }
+
+  async logout(userId: number) {
+    this.logger.log(`User ID ${userId} logged out successfully`);
+    return {
+      message: 'Logged out successfully',
+    };
+  }
 }
