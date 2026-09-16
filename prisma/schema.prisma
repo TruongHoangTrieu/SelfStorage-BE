@@ -6,3 +6,746 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+// ==========================================
+// 1. ENUMS
+// ==========================================
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum FacilityStatus {
+  ACTIVE
+  INACTIVE
+  UNDER_MAINTENANCE
+}
+
+enum UnitTypeStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum StorageUnitStatus {
+  AVAILABLE
+  RESERVED
+  OCCUPIED
+  UNDER_MAINTENANCE
+  OUT_OF_SERVICE
+}
+
+enum ReservationRentalPeriodUnit {
+  DAYS
+  WEEKS
+  MONTHS
+  YEARS
+}
+
+enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+  EXPIRED
+}
+
+enum ContractStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  OVERDUE
+  TERMINATED
+}
+
+enum AccessCodeStatus {
+  ACTIVE
+  INACTIVE
+  REVOKED
+  EXPIRED
+}
+
+enum ContractItemStatus {
+  ACTIVE
+  RETURNED
+  CANCELLED
+  OVERDUE
+}
+
+enum HandoverType {
+  CHECK_IN
+  CHECK_OUT
+  INSPECTION
+}
+
+enum PaymentType {
+  DEPOSIT
+  RENTAL
+  RENEWAL
+  EXTRA_CHARGE
+  REFUND
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  CARD
+  VNPAY
+  MOMO
+  PAYOS
+  OTHER
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+  CANCELLED
+}
+
+enum PolicyValueType {
+  NUMBER
+  STRING
+  BOOLEAN
+  JSON
+}
+
+enum PolicyStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum FeeAmountType {
+  FIXED
+  PERCENTAGE
+}
+
+enum FeeAppliesTo {
+  RESERVATION
+  CONTRACT
+  GENERAL
+}
+
+enum FeeTypeStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ExtraChargeStatus {
+  PENDING
+  PAID
+  WAIVED
+  CANCELLED
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED_AMOUNT
+}
+
+enum DiscountStatus {
+  ACTIVE
+  INACTIVE
+  EXPIRED
+}
+
+enum RenewalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+  COMPLETED
+}
+
+enum OverdueStatus {
+  OPEN
+  RESOLVED
+  WAIVED
+}
+
+enum SupportCategory {
+  UNIT
+  LOCK
+  ACCESS_CODE
+  PAYMENT
+  STORED_ITEMS
+  LOST_KEY
+  DAMAGE
+  OTHER
+}
+
+enum SupportPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum SupportStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+  CANCELLED
+}
+
+// ==========================================
+// 2. AUTH / USER (4 models)
+// ==========================================
+
+model Role {
+  id          Int      @id @default(autoincrement()) @map("id")
+  name        String   @unique @map("name")
+  description String?  @map("description")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  users User[]
+
+  @@map("roles")
+}
+
+model User {
+  id           Int        @id @default(autoincrement()) @map("id")
+  roleId       Int        @map("role_id")
+  fullName     String     @map("full_name")
+  email        String     @unique @map("email")
+  phone        String?    @map("phone")
+  passwordHash String     @map("password_hash")
+  status       UserStatus @default(ACTIVE) @map("status")
+  lastLoginAt  DateTime?  @map("last_login_at")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  role Role @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  staffFacilityAssignments StaffFacilityAssignment[] @relation("UserFacilityAssignments")
+  activityLogs             ActivityLog[]             @relation("UserActivityLogs")
+  reservations             Reservation[]             @relation("CustomerReservations")
+  rentalContracts          RentalContract[]          @relation("CustomerContracts")
+  handoverRecords          HandoverRecord[]          @relation("StaffHandoverRecords")
+  createdExtraCharges      ExtraCharge[]             @relation("CreatedExtraCharges")
+  appliedDiscountUsages    DiscountUsage[]           @relation("AppliedDiscountUsages")
+  requestedRenewals        ContractRenewal[]         @relation("RequestedRenewals")
+  approvedRenewals         ContractRenewal[]         @relation("ApprovedRenewals")
+  resolvedOverdues         OverdueRecord[]           @relation("ResolvedOverdues")
+  customerSupportRequests  SupportRequest[]          @relation("CustomerSupportRequests")
+  assignedSupportRequests  SupportRequest[]          @relation("AssignedSupportRequests")
+  supportRequestLogs       SupportRequestLog[]       @relation("UserSupportRequestLogs")
+
+  @@index([roleId])
+  @@index([status])
+  @@map("users")
+}
+
+model StaffFacilityAssignment {
+  id         Int       @id @default(autoincrement()) @map("id")
+  userId     Int       @map("user_id")
+  facilityId Int       @map("facility_id")
+  position   String    @map("position")
+  assignedAt DateTime  @default(now()) @map("assigned_at")
+  endedAt    DateTime? @map("ended_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  user     User     @relation("UserFacilityAssignments", fields: [userId], references: [id], onDelete: Restrict)
+  facility Facility @relation(fields: [facilityId], references: [id], onDelete: Restrict)
+
+  @@index([userId])
+  @@index([facilityId])
+  @@map("staff_facility_assignments")
+}
+
+model ActivityLog {
+  id          Int      @id @default(autoincrement()) @map("id")
+  userId      Int      @map("user_id")
+  action      String   @map("action")
+  entityType  String?  @map("entity_type")
+  entityId    Int?     @map("entity_id")
+  description String?  @map("description")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user User @relation("UserActivityLogs", fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([entityType, entityId])
+  @@map("activity_logs")
+}
+
+// ==========================================
+// 3. FACILITY / STORAGE UNIT (3 models)
+// ==========================================
+
+model Facility {
+  id          Int            @id @default(autoincrement()) @map("id")
+  name        String         @map("name")
+  code        String         @unique @map("code")
+  description String?        @map("description")
+  phone       String?        @map("phone")
+  email       String?        @map("email")
+  address     String         @map("address")
+  status      FacilityStatus @default(ACTIVE) @map("status")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+
+  staffAssignments StaffFacilityAssignment[]
+  storageUnitTypes StorageUnitType[]
+  storageUnits     StorageUnit[]
+  reservations     Reservation[]
+  policies         Policy[]
+  supportRequests  SupportRequest[]
+
+  @@map("facilities")
+}
+
+model StorageUnitType {
+  id            Int            @id @default(autoincrement()) @map("id")
+  facilityId    Int            @map("facility_id")
+  name          String         @map("name")
+  code          String         @map("code")
+  description   String?        @map("description")
+  size          Decimal        @map("size") @db.Decimal(14, 2)
+  sizeUnit      String         @default("m2") @map("size_unit")
+  depositAmount Decimal        @map("deposit_amount") @db.Decimal(14, 2)
+  status        UnitTypeStatus @default(ACTIVE) @map("status")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  facility         Facility          @relation(fields: [facilityId], references: [id], onDelete: Restrict)
+  storageUnits     StorageUnit[]
+  pricingRules     PricingRule[]
+  reservationItems ReservationItem[]
+
+  @@unique([facilityId, code])
+  @@index([facilityId])
+  @@index([status])
+  @@map("storage_unit_types")
+}
+
+model StorageUnit {
+  id         Int               @id @default(autoincrement()) @map("id")
+  facilityId Int               @map("facility_id")
+  unitTypeId Int               @map("unit_type_id")
+  unitNumber String            @map("unit_number")
+  floor      String?           @map("floor")
+  status     StorageUnitStatus @default(AVAILABLE) @map("status")
+  condition  String            @default("GOOD") @map("condition")
+  createdAt  DateTime          @default(now()) @map("created_at")
+  updatedAt  DateTime          @updatedAt @map("updated_at")
+
+  facility         Facility          @relation(fields: [facilityId], references: [id], onDelete: Restrict)
+  unitType         StorageUnitType   @relation(fields: [unitTypeId], references: [id], onDelete: Restrict)
+  reservationItems ReservationItem[]
+  contractItems    ContractItem[]
+
+  @@unique([facilityId, unitNumber])
+  @@index([facilityId])
+  @@index([unitTypeId])
+  @@index([status])
+  @@map("storage_units")
+}
+
+// ==========================================
+// 4. RESERVATION (2 models)
+// ==========================================
+
+model Reservation {
+  id               Int                         @id @default(autoincrement()) @map("id")
+  reservationCode  String                      @unique @map("reservation_code")
+  customerId       Int                         @map("customer_id")
+  facilityId       Int                         @map("facility_id")
+  rentalPeriod     Int                         @map("rental_period")
+  rentalPeriodUnit ReservationRentalPeriodUnit @default(MONTHS) @map("rental_period_unit")
+  appointmentDate  DateTime                    @map("appointment_date")
+  status           ReservationStatus           @default(PENDING) @map("status")
+  totalAmount      Decimal                     @map("total_amount") @db.Decimal(14, 2)
+  createdAt        DateTime                    @default(now()) @map("created_at")
+  updatedAt        DateTime                    @updatedAt @map("updated_at")
+
+  customer       User              @relation("CustomerReservations", fields: [customerId], references: [id], onDelete: Restrict)
+  facility       Facility          @relation(fields: [facilityId], references: [id], onDelete: Restrict)
+  items          ReservationItem[]
+  rentalContract RentalContract?
+  payments       Payment[]
+  extraCharges   ExtraCharge[]
+  discountUsages DiscountUsage[]
+
+  @@index([customerId])
+  @@index([facilityId])
+  @@index([status])
+  @@index([appointmentDate])
+  @@map("reservations")
+}
+
+model ReservationItem {
+  id            Int      @id @default(autoincrement()) @map("id")
+  reservationId Int      @map("reservation_id")
+  unitTypeId    Int      @map("unit_type_id")
+  unitId        Int?     @map("unit_id")
+  price         Decimal  @map("price") @db.Decimal(14, 2)
+  depositAmount Decimal  @map("deposit_amount") @db.Decimal(14, 2)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  reservation Reservation     @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  unitType    StorageUnitType @relation(fields: [unitTypeId], references: [id], onDelete: Restrict)
+  unit        StorageUnit?    @relation(fields: [unitId], references: [id], onDelete: SetNull)
+
+  @@index([reservationId])
+  @@index([unitTypeId])
+  @@index([unitId])
+  @@map("reservation_items")
+}
+
+// ==========================================
+// 5. RENTAL CONTRACT (2 models)
+// ==========================================
+
+model RentalContract {
+  id            Int            @id @default(autoincrement()) @map("id")
+  contractCode  String         @unique @map("contract_code")
+  reservationId Int            @unique @map("reservation_id")
+  customerId    Int            @map("customer_id")
+  startDate     DateTime       @map("start_date") @db.Date
+  endDate       DateTime       @map("end_date") @db.Date
+  status        ContractStatus @default(DRAFT) @map("status")
+  signedAt      DateTime?      @map("signed_at")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  reservation    Reservation       @relation(fields: [reservationId], references: [id], onDelete: Restrict)
+  customer       User              @relation("CustomerContracts", fields: [customerId], references: [id], onDelete: Restrict)
+  contractItems  ContractItem[]
+  payments       Payment[]
+  extraCharges   ExtraCharge[]
+  discountUsages DiscountUsage[]
+  renewals       ContractRenewal[]
+  overdueRecords OverdueRecord[]
+
+  @@index([reservationId])
+  @@index([customerId])
+  @@index([status])
+  @@index([startDate, endDate])
+  @@map("rental_contracts")
+}
+
+model ContractItem {
+  id               Int                @id @default(autoincrement()) @map("id")
+  contractId       Int                @map("contract_id")
+  unitId           Int                @map("unit_id")
+  rentalPrice      Decimal            @map("rental_price") @db.Decimal(14, 2)
+  depositAmount    Decimal            @map("deposit_amount") @db.Decimal(14, 2)
+  accessCode       String?            @map("access_code")
+  accessCodeStatus AccessCodeStatus   @default(INACTIVE) @map("access_code_status")
+  status           ContractItemStatus @default(ACTIVE) @map("status")
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+
+  contract        RentalContract   @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  unit            StorageUnit      @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  handoverRecords HandoverRecord[]
+  supportRequests SupportRequest[]
+
+  @@index([contractId])
+  @@index([unitId])
+  @@index([status])
+  @@map("contract_items")
+}
+
+// ==========================================
+// 6. HANDOVER (1 model)
+// ==========================================
+
+model HandoverRecord {
+  id             Int          @id @default(autoincrement()) @map("id")
+  contractItemId Int          @map("contract_item_id")
+  staffId        Int          @map("staff_id")
+  type           HandoverType @map("type")
+  condition      String       @map("condition")
+  notes          String?      @map("notes")
+  photos         Json?        @map("photos")
+  inspectionDate DateTime     @map("inspection_date")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  contractItem ContractItem @relation(fields: [contractItemId], references: [id], onDelete: Restrict)
+  staff        User         @relation("StaffHandoverRecords", fields: [staffId], references: [id], onDelete: Restrict)
+
+  @@index([contractItemId])
+  @@index([staffId])
+  @@index([type])
+  @@index([inspectionDate])
+  @@map("handover_records")
+}
+
+// ==========================================
+// 7. PAYMENT (1 model)
+// ==========================================
+
+model Payment {
+  id                   Int           @id @default(autoincrement()) @map("id")
+  paymentCode          String        @unique @map("payment_code")
+  reservationId        Int?          @map("reservation_id")
+  contractId           Int?          @map("contract_id")
+  paymentType          PaymentType   @map("payment_type")
+  amount               Decimal       @map("amount") @db.Decimal(14, 2)
+  paymentMethod        PaymentMethod @default(VNPAY) @map("payment_method")
+  transactionReference String?       @map("transaction_reference")
+  status               PaymentStatus @default(PENDING) @map("status")
+  paidAt               DateTime?     @map("paid_at")
+  createdAt            DateTime      @default(now()) @map("created_at")
+  updatedAt            DateTime      @updatedAt @map("updated_at")
+
+  reservation Reservation?    @relation(fields: [reservationId], references: [id], onDelete: Restrict)
+  contract    RentalContract? @relation(fields: [contractId], references: [id], onDelete: Restrict)
+
+  @@index([reservationId])
+  @@index([contractId])
+  @@index([paymentType])
+  @@index([status])
+  @@index([paidAt])
+  @@map("payments")
+}
+
+// ==========================================
+// 8. BUSINESS POLICIES (1 model)
+// ==========================================
+
+model Policy {
+  id            Int             @id @default(autoincrement()) @map("id")
+  facilityId    Int?            @map("facility_id")
+  policyType    String          @map("policy_type")
+  name          String          @map("name")
+  description   String?         @map("description")
+  value         Json            @map("value")
+  valueType     PolicyValueType @default(JSON) @map("value_type")
+  effectiveFrom DateTime        @map("effective_from") @db.Date
+  effectiveTo   DateTime?       @map("effective_to") @db.Date
+  status        PolicyStatus    @default(ACTIVE) @map("status")
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+
+  facility Facility? @relation(fields: [facilityId], references: [id], onDelete: Restrict)
+
+  @@index([facilityId])
+  @@index([policyType])
+  @@index([status])
+  @@index([effectiveFrom])
+  @@map("policies")
+}
+
+// ==========================================
+// 9. PRICING (1 model)
+// ==========================================
+
+model PricingRule {
+  id            Int       @id @default(autoincrement()) @map("id")
+  unitTypeId    Int       @map("unit_type_id")
+  price         Decimal   @map("price") @db.Decimal(14, 2)
+  effectiveFrom DateTime  @map("effective_from") @db.Date
+  effectiveTo   DateTime? @map("effective_to") @db.Date
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  unitType StorageUnitType @relation(fields: [unitTypeId], references: [id], onDelete: Restrict)
+
+  @@index([unitTypeId])
+  @@index([effectiveFrom])
+  @@map("pricing_rules")
+}
+
+// ==========================================
+// 10. FEES (2 models)
+// ==========================================
+
+model FeeType {
+  id            Int           @id @default(autoincrement()) @map("id")
+  name          String        @map("name")
+  code          String        @unique @map("code")
+  description   String?       @map("description")
+  defaultAmount Decimal       @map("default_amount") @db.Decimal(14, 2)
+  amountType    FeeAmountType @default(FIXED) @map("amount_type")
+  appliesTo     FeeAppliesTo  @default(GENERAL) @map("applies_to")
+  status        FeeTypeStatus @default(ACTIVE) @map("status")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  extraCharges ExtraCharge[]
+
+  @@map("fee_types")
+}
+
+model ExtraCharge {
+  id            Int               @id @default(autoincrement()) @map("id")
+  contractId    Int?              @map("contract_id")
+  reservationId Int?              @map("reservation_id")
+  feeTypeId     Int               @map("fee_type_id")
+  amount        Decimal           @map("amount") @db.Decimal(14, 2)
+  reason        String?           @map("reason")
+  status        ExtraChargeStatus @default(PENDING) @map("status")
+  createdBy     Int               @map("created_by")
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
+
+  contract    RentalContract? @relation(fields: [contractId], references: [id], onDelete: Restrict)
+  reservation Reservation?    @relation(fields: [reservationId], references: [id], onDelete: Restrict)
+  feeType     FeeType         @relation(fields: [feeTypeId], references: [id], onDelete: Restrict)
+  creator     User            @relation("CreatedExtraCharges", fields: [createdBy], references: [id], onDelete: Restrict)
+
+  @@index([contractId])
+  @@index([reservationId])
+  @@index([feeTypeId])
+  @@index([status])
+  @@map("extra_charges")
+}
+
+// ==========================================
+// 11. DISCOUNTS (2 models)
+// ==========================================
+
+model Discount {
+  id           Int            @id @default(autoincrement()) @map("id")
+  code         String         @unique @map("code")
+  name         String         @map("name")
+  description  String?        @map("description")
+  discountType DiscountType   @default(PERCENTAGE) @map("discount_type")
+  value        Decimal        @map("value") @db.Decimal(14, 2)
+  startDate    DateTime       @map("start_date") @db.Date
+  endDate      DateTime?      @map("end_date") @db.Date
+  maxUsage     Int?           @map("max_usage")
+  status       DiscountStatus @default(ACTIVE) @map("status")
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime       @updatedAt @map("updated_at")
+
+  discountUsages DiscountUsage[]
+
+  @@map("discounts")
+}
+
+model DiscountUsage {
+  id            Int      @id @default(autoincrement()) @map("id")
+  discountId    Int      @map("discount_id")
+  reservationId Int?     @map("reservation_id")
+  contractId    Int?     @map("contract_id")
+  appliedAmount Decimal  @map("applied_amount") @db.Decimal(14, 2)
+  appliedBy     Int?     @map("applied_by")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  discount    Discount        @relation(fields: [discountId], references: [id], onDelete: Restrict)
+  reservation Reservation?    @relation(fields: [reservationId], references: [id], onDelete: Restrict)
+  contract    RentalContract? @relation(fields: [contractId], references: [id], onDelete: Restrict)
+  applier     User?           @relation("AppliedDiscountUsages", fields: [appliedBy], references: [id], onDelete: Restrict)
+
+  @@index([discountId])
+  @@index([reservationId])
+  @@index([contractId])
+  @@map("discount_usages")
+}
+
+// ==========================================
+// 12. RENEWAL — FLOW 6 (1 model)
+// ==========================================
+
+model ContractRenewal {
+  id          Int           @id @default(autoincrement()) @map("id")
+  contractId  Int           @map("contract_id")
+  oldEndDate  DateTime      @map("old_end_date") @db.Date
+  newEndDate  DateTime      @map("new_end_date") @db.Date
+  renewalFee  Decimal       @map("renewal_fee") @db.Decimal(14, 2)
+  requestedBy Int           @map("requested_by")
+  approvedBy  Int?          @map("approved_by")
+  status      RenewalStatus @default(PENDING) @map("status")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  contract  RentalContract @relation(fields: [contractId], references: [id], onDelete: Restrict)
+  requester User           @relation("RequestedRenewals", fields: [requestedBy], references: [id], onDelete: Restrict)
+  approver  User?          @relation("ApprovedRenewals", fields: [approvedBy], references: [id], onDelete: Restrict)
+
+  @@index([contractId])
+  @@index([requestedBy])
+  @@index([approvedBy])
+  @@index([status])
+  @@map("contract_renewals")
+}
+
+// ==========================================
+// 13. OVERDUE — FLOW 6 (1 model)
+// ==========================================
+
+model OverdueRecord {
+  id               Int           @id @default(autoincrement()) @map("id")
+  contractId       Int           @map("contract_id")
+  overdueStartDate DateTime      @map("overdue_start_date") @db.Date
+  overdueDays      Int           @map("overdue_days")
+  overdueFee       Decimal       @map("overdue_fee") @db.Decimal(14, 2)
+  status           OverdueStatus @default(OPEN) @map("status")
+  resolvedBy       Int?          @map("resolved_by")
+  resolvedAt       DateTime?     @map("resolved_at")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+
+  contract RentalContract @relation(fields: [contractId], references: [id], onDelete: Restrict)
+  resolver User?          @relation("ResolvedOverdues", fields: [resolvedBy], references: [id], onDelete: Restrict)
+
+  @@index([contractId])
+  @@index([status])
+  @@index([overdueStartDate])
+  @@map("overdue_records")
+}
+
+// ==========================================
+// 14. SUPPORT — FLOW 7 (2 models)
+// ==========================================
+
+model SupportRequest {
+  id              Int             @id @default(autoincrement()) @map("id")
+  requestCode     String          @unique @map("request_code")
+  customerId      Int             @map("customer_id")
+  contractItemId  Int?            @map("contract_item_id")
+  facilityId      Int             @map("facility_id")
+  category        SupportCategory @default(OTHER) @map("category")
+  subject         String          @map("subject")
+  description     String          @map("description")
+  priority        SupportPriority @default(MEDIUM) @map("priority")
+  status          SupportStatus   @default(OPEN) @map("status")
+  assignedStaffId Int?            @map("assigned_staff_id")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  resolvedAt      DateTime?       @map("resolved_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  customer      User                @relation("CustomerSupportRequests", fields: [customerId], references: [id], onDelete: Restrict)
+  contractItem  ContractItem?       @relation(fields: [contractItemId], references: [id], onDelete: Restrict)
+  facility      Facility            @relation(fields: [facilityId], references: [id], onDelete: Restrict)
+  assignedStaff User?               @relation("AssignedSupportRequests", fields: [assignedStaffId], references: [id], onDelete: Restrict)
+  logs          SupportRequestLog[]
+
+  @@index([customerId])
+  @@index([contractItemId])
+  @@index([facilityId])
+  @@index([assignedStaffId])
+  @@index([status])
+  @@index([priority])
+  @@map("support_requests")
+}
+
+model SupportRequestLog {
+  id               Int            @id @default(autoincrement()) @map("id")
+  supportRequestId Int            @map("support_request_id")
+  userId           Int            @map("user_id")
+  note             String         @map("note")
+  oldStatus        SupportStatus? @map("old_status")
+  newStatus        SupportStatus? @map("new_status")
+  createdAt        DateTime       @default(now()) @map("created_at")
+
+  supportRequest SupportRequest @relation(fields: [supportRequestId], references: [id], onDelete: Cascade)
+  user           User           @relation("UserSupportRequestLogs", fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([supportRequestId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("support_request_logs")
+}
