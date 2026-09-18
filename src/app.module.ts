@@ -8,6 +8,7 @@ import { AuthModule } from './auth/auth.module';
 import { FacilitiesModule } from './facilities/facilities.module';
 import { StorageUnitTypesModule } from './storage-unit-types/storage-unit-types.module';
 import { StorageUnitsModule } from './storage-units/storage-units.module';
+import { ReservationsModule } from './reservations/reservations.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { StorageUnitsModule } from './storage-units/storage-units.module';
     FacilitiesModule,
     StorageUnitTypesModule,
     StorageUnitsModule,
+    ReservationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

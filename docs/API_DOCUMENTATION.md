@@ -333,9 +333,261 @@ Tài liệu này ghi lại danh sách tất cả các API đã phát triển tro
 
 ---
 
+### 📅 NHÓM 5: RESERVATIONS / ĐẶT CHỖ THUÊ KHO
+
+#### 3.17. Kiểm tra tính khả dụng và dự toán giá kho (Check Availability)
+- **Method**: `GET`
+- **Endpoint**: `/reservations/availability`
+- **Yêu cầu Auth**: **Bắt buộc** (`JwtAuthGuard`)
+- **Query Params**:
+  - `facilityId` (bắt buộc - số nguyên)
+  - `unitTypeId` (bắt buộc - số nguyên)
+  - `appointmentDate` (optional - ISO Date string)
+  - `rentalPeriod` (optional - số nguyên >= 1)
+  - `rentalPeriodUnit` (optional: `DAYS`, `WEEKS`, `MONTHS`, `YEARS` - mặc định: `MONTHS`)
+- **Ví dụ gọi**: `/reservations/availability?facilityId=1&unitTypeId=1&rentalPeriod=3`
+
+**Response Success (`200 OK`):**
+```json
+{
+  "facility": {
+    "id": 1,
+    "name": "Self Storage Facility Alpha",
+    "code": "FAC_ALPHA",
+    "address": "123 Nguyen Hue, District 1, HCMC",
+    "phone": "0901112222",
+    "email": "alpha@selfstorage.com"
+  },
+  "unitType": {
+    "id": 1,
+    "name": "Small Unit (2.5m2)",
+    "code": "TYPE_S",
+    "size": "2.50",
+    "sizeUnit": "m2",
+    "depositAmount": "500000.00"
+  },
+  "availableCount": 5,
+  "availableUnits": [
+    {
+      "id": 1,
+      "unitNumber": "A-101",
+      "floor": "1st Floor",
+      "status": "AVAILABLE",
+      "condition": "GOOD"
+    }
+  ],
+  "pricing": {
+    "rentalPricePerPeriod": "1000000.00",
+    "depositAmount": "500000.00",
+    "estimatedTotal": "3500000.00"
+  }
+}
+```
+
+#### 3.18. Tạo đơn đặt chỗ mới (Create Reservation)
+- **Method**: `POST`
+- **Endpoint**: `/reservations`
+- **Yêu cầu Auth**: **Bắt buộc** (`JwtAuthGuard`, `RolesGuard`)
+- **Roles cho phép**: `STORAGE_CUSTOMER`
+- **Quy tắc & Cơ chế bảo vệ**:
+  - `facilityId` và `unitTypeId` phải tồn tại, đang `ACTIVE` và liên kết hợp lệ với nhau.
+  - `appointmentDate` phải là ngày hợp lệ và không được nằm trong quá khứ.
+  - `rentalPeriod` phải là số nguyên >= 1.
+  - **Chống Double Booking / Race condition**: Sử dụng `prisma.$transaction` kết hợp kiểm tra khóa nguyên tử `status: AVAILABLE -> RESERVED`.
+  - Tự động sinh mã `reservationCode` duy nhất định dạng `RSV-YYYYMMDD-XXXXXX`.
+  - Lấy `customerId` tự động từ `@CurrentUser()`, cấm truyền `customerId` qua body.
+
+**Request Body:**
+```json
+{
+  "facilityId": 1,
+  "unitTypeId": 1,
+  "appointmentDate": "2026-10-01T09:00:00.000Z",
+  "rentalPeriod": 3,
+  "rentalPeriodUnit": "MONTHS",
+  "notes": "Cần kiểm tra kho trước khi nhận"
+}
+```
+
+**Response Success (`201 Created`):**
+```json
+{
+  "id": 1,
+  "reservationCode": "RSV-20260918-A1B2C3",
+  "customerId": 5,
+  "facilityId": 1,
+  "rentalPeriod": 3,
+  "rentalPeriodUnit": "MONTHS",
+  "appointmentDate": "2026-10-01T09:00:00.000Z",
+  "status": "PENDING",
+  "totalAmount": "3500000.00",
+  "createdAt": "2026-09-18T18:40:00.000Z",
+  "updatedAt": "2026-09-18T18:40:00.000Z",
+  "facility": {
+    "id": 1,
+    "name": "Self Storage Facility Alpha",
+    "code": "FAC_ALPHA",
+    "address": "123 Nguyen Hue, District 1, HCMC"
+  },
+  "items": [
+    {
+      "id": 1,
+      "reservationId": 1,
+      "unitTypeId": 1,
+      "unitId": 1,
+      "price": "1000000.00",
+      "depositAmount": "500000.00",
+      "unitType": {
+        "id": 1,
+        "name": "Small Unit (2.5m2)",
+        "code": "TYPE_S",
+        "size": "2.50",
+        "sizeUnit": "m2",
+        "depositAmount": "500000.00"
+      },
+      "unit": {
+        "id": 1,
+        "unitNumber": "A-101",
+        "floor": "1st Floor",
+        "status": "RESERVED"
+      }
+    }
+  ],
+  "customer": {
+    "id": 5,
+    "fullName": "Nguyễn Văn Khách Hàng",
+    "email": "customer@selfstorage.com",
+    "phone": "0900000005"
+  }
+}
+```
+
+#### 3.19. Lấy danh sách đơn đặt chỗ (Get Reservations List)
+- **Method**: `GET`
+- **Endpoint**: `/reservations`
+- **Yêu cầu Auth**: **Bắt buộc** (`JwtAuthGuard`)
+- **Phân quyền (Ownership & RBAC)**:
+  - Khách hàng (`STORAGE_CUSTOMER`): **Chỉ xem được danh sách đơn của chính mình**.
+  - Nhân viên / Quản lý / Admin: Được xem toàn bộ đơn, có thể lọc theo `customerId`, `facilityId`, `status`.
+- **Query Params**:
+  - `page` (optional - mặc định: 1)
+  - `limit` (optional - mặc định: 10)
+  - `status` (optional: `PENDING`, `CONFIRMED`, `CANCELLED`, `COMPLETED`, `EXPIRED`)
+  - `facilityId` (optional - dành cho Staff/Manager/Admin)
+  - `customerId` (optional - dành cho Staff/Manager/Admin)
+- **Ví dụ gọi**: `/reservations?page=1&limit=10&status=PENDING`
+
+**Response Success (`200 OK`):**
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "reservationCode": "RSV-20260918-A1B2C3",
+      "customerId": 5,
+      "facilityId": 1,
+      "rentalPeriod": 3,
+      "rentalPeriodUnit": "MONTHS",
+      "appointmentDate": "2026-10-01T09:00:00.000Z",
+      "status": "PENDING",
+      "totalAmount": "3500000.00",
+      "createdAt": "2026-09-18T18:40:00.000Z",
+      "facility": {
+        "id": 1,
+        "name": "Self Storage Facility Alpha",
+        "code": "FAC_ALPHA",
+        "address": "123 Nguyen Hue, District 1, HCMC"
+      },
+      "items": [
+        {
+          "unitType": {
+            "id": 1,
+            "name": "Small Unit (2.5m2)",
+            "code": "TYPE_S"
+          },
+          "unit": {
+            "id": 1,
+            "unitNumber": "A-101",
+            "floor": "1st Floor",
+            "status": "RESERVED"
+          }
+        }
+      ]
+    }
+  ],
+  "pagination": {
+    "total": 1,
+    "page": 1,
+    "limit": 10,
+    "totalPages": 1
+  }
+}
+```
+
+#### 3.20. Lấy chi tiết đơn đặt chỗ (Get Reservation Detail)
+- **Method**: `GET`
+- **Endpoint**: `/reservations/:id`
+- **Yêu cầu Auth**: **Bắt buộc** (`JwtAuthGuard`)
+- **Phân quyền**: Customer chỉ xem được đơn của chính mình (nếu xem đơn của khách khác sẽ nhận lỗi `403 Forbidden`). Staff/Manager/Admin có quyền xem chi tiết.
+
+#### 3.21. Cập nhật đơn đặt chỗ (Update Reservation)
+- **Method**: `PATCH`
+- **Endpoint**: `/reservations/:id`
+- **Yêu cầu Auth**: **Bắt buộc** (`JwtAuthGuard`)
+- **Quy tắc**:
+  - Không được sửa đơn đã ở trạng thái `CANCELLED`, `COMPLETED`, hoặc `EXPIRED`.
+  - Nếu thay đổi `rentalPeriod`, hệ thống tự động tính toán lại `totalAmount`.
+  - Cấm thay đổi các trường cố định: `customerId`, `facilityId`, `reservationCode`, `unitTypeId`.
+
+**Request Body (chỉ truyền các trường cần đổi):**
+```json
+{
+  "appointmentDate": "2026-10-05T14:00:00.000Z",
+  "rentalPeriod": 6,
+  "rentalPeriodUnit": "MONTHS"
+}
+```
+
+#### 3.22. Hủy đơn đặt chỗ (Cancel Reservation)
+- **Method**: `POST`
+- **Endpoint**: `/reservations/:id/cancel`
+- **Yêu cầu Auth**: **Bắt buộc** (`JwtAuthGuard`)
+- **Quy tắc & Cơ chế hoàn trả kho**:
+  - Customer chỉ hủy được đơn của chính mình.
+  - Không cho phép hủy đơn đã `CANCELLED`, `COMPLETED`, hoặc `EXPIRED`.
+  - **Giải phóng kho trong Transaction**: Chuyển trạng thái kho tương ứng từ `RESERVED` trở về `AVAILABLE` ngay lập tức.
+  - Cập nhật trạng thái `Reservation.status = CANCELLED`.
+
+**Request Body (Optional):**
+```json
+{
+  "reason": "Thay đổi kế hoạch kinh doanh"
+}
+```
+
+**Response Success (`200 OK`):**
+```json
+{
+  "id": 1,
+  "reservationCode": "RSV-20260918-A1B2C3",
+  "status": "CANCELLED",
+  "items": [
+    {
+      "unit": {
+        "id": 1,
+        "unitNumber": "A-101",
+        "status": "AVAILABLE"
+      }
+    }
+  ]
+}
+```
+
+---
+
 ## 🛠️ 4. Hướng Dẫn Kế Thừa Kiến Trúc Cho Các Dev Tiếp Theo
 
-Khi xây dựng các module nghiệp vụ tiếp theo (Reservation, Contract, Payment, Support, v.v.):
+Khi xây dựng các module nghiệp vụ tiếp theo (Contract, Payment, Support, v.v.):
 
 1. **Bảo vệ API yêu cầu đăng nhập**:
    ```typescript
@@ -359,3 +611,4 @@ Khi xây dựng các module nghiệp vụ tiếp theo (Reservation, Contract, Pa
    }
    ```
 5. **Truy cập Database**: Sử dụng `PrismaService` inject từ `DatabaseModule`.
+
