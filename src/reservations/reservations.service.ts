@@ -336,6 +336,23 @@ export class ReservationsService {
       where.status = filter.status;
     }
 
+    if (filter.phone) {
+      where.customer = {
+        ...((where.customer as Prisma.UserWhereInput) || {}),
+        phone: { contains: filter.phone.trim() },
+      };
+    }
+
+    if (filter.search) {
+      const search = filter.search.trim();
+      where.OR = [
+        { reservationCode: { contains: search, mode: 'insensitive' } },
+        { customer: { phone: { contains: search } } },
+        { customer: { fullName: { contains: search, mode: 'insensitive' } } },
+        { customer: { email: { contains: search, mode: 'insensitive' } } },
+      ];
+    }
+
     const [total, data] = await Promise.all([
       this.prisma.reservation.count({ where }),
       this.prisma.reservation.findMany({

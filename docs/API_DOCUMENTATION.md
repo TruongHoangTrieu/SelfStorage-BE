@@ -475,7 +475,11 @@ Tài liệu này ghi lại danh sách tất cả các API đã phát triển tro
   - `status` (optional: `PENDING`, `CONFIRMED`, `CANCELLED`, `COMPLETED`, `EXPIRED`)
   - `facilityId` (optional - dành cho Staff/Manager/Admin)
   - `customerId` (optional - dành cho Staff/Manager/Admin)
-- **Ví dụ gọi**: `/reservations?page=1&limit=10&status=PENDING`
+  - `search` (optional - tìm kiếm nhanh theo SĐT, họ tên, email hoặc mã đơn `reservationCode`)
+  - `phone` (optional - tìm kiếm đích danh theo số điện thoại khách hàng)
+- **Ví dụ gọi**:
+  - `/reservations?page=1&limit=10&status=PENDING`
+  - `/reservations?search=0901234567` (Tìm theo số điện thoại hoặc mã đơn)
 
 **Response Success (`200 OK`):**
 ```json
@@ -583,6 +587,155 @@ Tài liệu này ghi lại danh sách tất cả các API đã phát triển tro
 }
 ```
 
+### 🤝 NHÓM 5: HANDOVER & CHECK-IN / BÀN GIAO KHO (FLOW 2)
+
+#### 3.23. Tra cứu thông tin đơn để chuẩn bị Check-in (Get Reservation For Check-in)
+- **Method**: `GET`
+- **Endpoint**: `/handovers/reservations/:reservationId`
+- **Yêu cầu Auth**: **Bắt buộc** (`JwtAuthGuard`, `RolesGuard`)
+- **Roles cho phép**: `FACILITY_STAFF`, `FACILITY_MANAGER`, `BUSINESS_OPERATIONS_MANAGER`, `SYSTEM_ADMINISTRATOR`
+- **Phân quyền trạm (Staff Facility Scope)**: Nếu là `FACILITY_STAFF`, nhân viên bắt buộc phải có phân công (`StaffFacilityAssignment`) tại cơ sở của đơn đặt chỗ đó. Nếu trái cơ sở sẽ nhận `403 Forbidden`.
+- **Mục đích**: Nhân viên quét mã QR hoặc nhập ID/mã đơn để kiểm tra thông tin khách hàng, cơ sở, loại kho và vị trí kho vật lý đã giữ trước khi dẫn khách đi kiểm tra thực tế.
+
+**Response Success (`200 OK`):**
+```json
+{
+  "id": 1,
+  "reservationCode": "RSV-20260918-A1B2C3",
+  "customerId": 5,
+  "facilityId": 1,
+  "rentalPeriod": 3,
+  "rentalPeriodUnit": "MONTHS",
+  "appointmentDate": "2026-10-01T09:00:00.000Z",
+  "status": "PENDING",
+  "totalAmount": "3500000.00",
+  "createdAt": "2026-09-18T18:40:00.000Z",
+  "facility": {
+    "id": 1,
+    "name": "Self Storage Facility Alpha",
+    "code": "FAC_ALPHA",
+    "address": "123 Nguyen Hue, District 1, HCMC",
+    "phone": "0901112222",
+    "email": "alpha@selfstorage.com"
+  },
+  "customer": {
+    "id": 5,
+    "fullName": "Nguyễn Văn Khách Hàng",
+    "email": "customer@selfstorage.com",
+    "phone": "0900000005",
+    "status": "ACTIVE"
+  },
+  "items": [
+    {
+      "id": 1,
+      "reservationId": 1,
+      "unitTypeId": 1,
+      "unitId": 1,
+      "price": "1000000.00",
+      "depositAmount": "500000.00",
+      "unitType": {
+        "id": 1,
+        "name": "Small Unit (2.5m2)",
+        "code": "TYPE_S",
+        "size": "2.50",
+        "sizeUnit": "m2",
+        "depositAmount": "500000.00"
+      },
+      "unit": {
+        "id": 1,
+        "unitNumber": "A-101",
+        "floor": "1st Floor",
+        "status": "RESERVED",
+        "condition": "GOOD"
+      }
+    }
+  ],
+  "rentalContract": null
+}
+```
+
+#### 3.24. Thực hiện Check-in & Bàn giao kho (Perform Check-in & Handover)
+- **Method**: `POST`
+- **Endpoint**: `/handovers/check-in`
+- **Yêu cầu Auth**: **Bắt buộc** (`JwtAuthGuard`, `RolesGuard`)
+- **Roles cho phép**: `FACILITY_STAFF`, `FACILITY_MANAGER`, `BUSINESS_OPERATIONS_MANAGER`, `SYSTEM_ADMINISTRATOR`
+- **Quy tắc nghiệp vụ & Tính toàn vẹn (ACID Transaction)**:
+  1. Sử dụng đúng `unitId` đã giữ chỗ từ `ReservationItem.unitId` (không nhận `unitId` từ client).
+  2. Khóa chuyển đổi trạng thái kho vật lý: `StorageUnit.status` chuyển từ `RESERVED` ──> `OCCUPIED` (chống double check-in bằng conditional row-level update).
+  3. Tính toán `startDate` và `endDate` theo chu kỳ thuê (`DAYS`, `WEEKS`, `MONTHS`, `YEARS`).
+  4. Tự động sinh mã hợp đồng duy nhất `contractCode` (`CON-YYYYMMDD-XXXXXX`) và tạo `RentalContract` với trạng thái `ACTIVE`.
+  5. Tạo `ContractItem` tương ứng, tự động sinh mã PIN truy cập số 6 chữ số (`accessCode`) và kích hoạt `accessCodeStatus = ACTIVE`.
+  6. Lập biên bản bàn giao `HandoverRecord` (`type: CHECK_IN`, `staffId` lấy tự động từ JWT, lưu hiện trạng `condition`, ghi chú `notes`, và hình ảnh `photos`).
+  7. Chuyển trạng thái đơn đặt chỗ: `Reservation.status` chuyển sang `COMPLETED`.
+
+**Request Body:**
+```json
+{
+  "reservationId": 1,
+  "condition": "Kho sạch sẽ, không hư hỏng, khóa cửa hoạt động tốt",
+  "notes": "Đã bàn giao mã PIN truy cập và hướng dẫn sử dụng cửa điện tử",
+  "photos": [
+    "https://storage.example.com/photos/unit-A101-checkin-1.jpg",
+    "https://storage.example.com/photos/unit-A101-checkin-2.jpg"
+  ]
+}
+```
+
+**Response Success (`200 OK`):**
+```json
+{
+  "message": "Check-in and handover completed successfully",
+  "reservation": {
+    "id": 1,
+    "reservationCode": "RSV-20260918-A1B2C3",
+    "status": "COMPLETED",
+    "facility": {
+      "id": 1,
+      "name": "Self Storage Facility Alpha",
+      "code": "FAC_ALPHA",
+      "address": "123 Nguyen Hue, District 1, HCMC"
+    },
+    "customer": {
+      "id": 5,
+      "fullName": "Nguyễn Văn Khách Hàng",
+      "email": "customer@selfstorage.com",
+      "phone": "0900000005"
+    }
+  },
+  "contract": {
+    "id": 1,
+    "contractCode": "CON-20260919-XYZ789",
+    "status": "ACTIVE",
+    "startDate": "2026-09-19T00:00:00.000Z",
+    "endDate": "2026-12-19T00:00:00.000Z",
+    "signedAt": "2026-09-19T12:00:00.000Z"
+  },
+  "contractItems": [
+    {
+      "id": 1,
+      "unitId": 1,
+      "unitNumber": "A-101",
+      "rentalPrice": "1000000.00",
+      "depositAmount": "500000.00",
+      "accessCode": "849201",
+      "accessCodeStatus": "ACTIVE",
+      "status": "ACTIVE"
+    }
+  ],
+  "handoverRecords": [
+    {
+      "id": 1,
+      "contractItemId": 1,
+      "staffId": 4,
+      "type": "CHECK_IN",
+      "condition": "Kho sạch sẽ, không hư hỏng, khóa cửa hoạt động tốt",
+      "notes": "Đã bàn giao mã PIN truy cập và hướng dẫn sử dụng cửa điện tử",
+      "inspectionDate": "2026-09-19T12:00:00.000Z"
+    }
+  ]
+}
+```
+
 ---
 
 ## 🛠️ 4. Hướng Dẫn Kế Thừa Kiến Trúc Cho Các Dev Tiếp Theo
@@ -611,4 +764,5 @@ Khi xây dựng các module nghiệp vụ tiếp theo (Contract, Payment, Suppor
    }
    ```
 5. **Truy cập Database**: Sử dụng `PrismaService` inject từ `DatabaseModule`.
+
 

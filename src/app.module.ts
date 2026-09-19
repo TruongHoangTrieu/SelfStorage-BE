@@ -9,6 +9,7 @@ import { FacilitiesModule } from './facilities/facilities.module';
 import { StorageUnitTypesModule } from './storage-unit-types/storage-unit-types.module';
 import { StorageUnitsModule } from './storage-units/storage-units.module';
 import { ReservationsModule } from './reservations/reservations.module';
+import { HandoversModule } from './handovers/handovers.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { ReservationsModule } from './reservations/reservations.module';
     StorageUnitTypesModule,
     StorageUnitsModule,
     ReservationsModule,
+    HandoversModule,
   ],
   controllers: [AppController],
   providers: [AppService],

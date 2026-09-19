@@ -227,6 +227,30 @@ describe('ReservationsService', () => {
     });
   });
 
+  describe('findAll', () => {
+    it('should filter by search keyword (phone/name/code) for staff', async () => {
+      mockPrismaService.reservation.count.mockResolvedValue(1);
+      mockPrismaService.reservation.findMany.mockResolvedValue([
+        { id: 1, reservationCode: 'RSV-123' },
+      ]);
+
+      const staffUser = { id: 2, role: UserRole.FACILITY_STAFF };
+      const result = await service.findAll(
+        { search: '0901234567', page: 1, limit: 10 },
+        staffUser,
+      );
+
+      expect(result.data.length).toBe(1);
+      expect(mockPrismaService.reservation.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            OR: expect.any(Array),
+          }),
+        }),
+      );
+    });
+  });
+
   describe('update', () => {
     const validFutureDate = new Date(Date.now() + 86400000 * 5).toISOString();
     const existingReservation = {

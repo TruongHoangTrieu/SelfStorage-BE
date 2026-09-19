@@ -28,4 +28,10 @@ export class FilterReservationDto {
   @IsOptional()
   @IsEnum(ReservationStatus)
   status?: ReservationStatus;
+
+  @IsOptional()
+  search?: string;
+
+  @IsOptional()
+  phone?: string;
 }
