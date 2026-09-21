@@ -1,10 +1,10 @@
-# 📚 SelfStorage - API Documentation
+# SelfStorage - API Documentation
 
 Tài liệu này ghi lại danh sách tất cả các API đã phát triển trong hệ thống Backend NestJS, định dạng request/response, cơ chế bảo vệ (Guards) và phân quyền (RBAC).
 
 ---
 
-## 🌐 1. Thông Tin Cơ Bản (General Info)
+## 1. Thông Tin Cơ Bản (General Info)
 - **Base URL**: `http://localhost:5000`
 - **Content-Type**: `application/json`
 - **Cơ chế xác thực**: `JWT Bearer Token`
@@ -12,7 +12,7 @@ Tài liệu này ghi lại danh sách tất cả các API đã phát triển tro
 
 ---
 
-## 👥 2. Danh Sách Roles & Tài Khoản Mẫu (IAM / RBAC / Test Accounts)
+## 2. Danh Sách Roles & Tài Khoản Mẫu (IAM / RBAC / Test Accounts)
 
 ### 2.1. Phân quyền (Roles)
 1. `STORAGE_CUSTOMER`: Khách hàng thuê kho / sử dụng dịch vụ.
@@ -33,9 +33,9 @@ Tài liệu này ghi lại danh sách tất cả các API đã phát triển tro
 
 ---
 
-## 📋 3. Danh Sách API Đã Hoàn Thành
+## 3. Danh Sách API Đã Hoàn Thành
 
-### 🔐 NHÓM 1: AUTHENTICATION & IAM
+### NHÓM 1: AUTHENTICATION & IAM
 
 #### 3.1. Đăng ký khách hàng mới (Register)
 - **Method**: `POST`
@@ -46,29 +46,29 @@ Tài liệu này ghi lại danh sách tất cả các API đã phát triển tro
 **Request Body:**
 ```json
 {
-  "fullName": "Nguyễn Văn Khách Hàng Mới",
-  "email": "newcustomer@selfstorage.com",
-  "phone": "0909999888",        // Không bắt buộc (Optional)
-  "password": "Password123!"
+ "fullName": "Nguyễn Văn Khách Hàng Mới",
+ "email": "newcustomer@selfstorage.com",
+ "phone": "0909999888", // Không bắt buộc (Optional)
+ "password": "Password123!"
 }
 ```
 
 **Response Success (`201 Created`):**
 ```json
 {
-  "message": "Registration successful",
-  "user": {
-    "id": 6,
-    "roleId": 1,
-    "fullName": "Nguyễn Văn Khách Hàng Mới",
-    "email": "newcustomer@selfstorage.com",
-    "phone": "0909999888",
-    "status": "ACTIVE",
-    "lastLoginAt": null,
-    "createdAt": "2026-09-16T14:30:00.000Z",
-    "updatedAt": "2026-09-16T14:30:00.000Z",
-    "role": "STORAGE_CUSTOMER"
-  }
+ "message": "Registration successful",
+ "user": {
+ "id": 6,
+ "roleId": 1,
+ "fullName": "Nguyễn Văn Khách Hàng Mới",
+ "email": "newcustomer@selfstorage.com",
+ "phone": "0909999888",
+ "status": "ACTIVE",
+ "lastLoginAt": null,
+ "createdAt": "2026-09-16T14:30:00.000Z",
+ "updatedAt": "2026-09-16T14:30:00.000Z",
+ "role": "STORAGE_CUSTOMER"
+ }
 }
 ```
 
@@ -81,8 +81,8 @@ Tài liệu này ghi lại danh sách tất cả các API đã phát triển tro
 **Request Body:**
 ```json
 {
-  "email": "customer@selfstorage.com",
-  "password": "Customer@123456"
+ "email": "customer@selfstorage.com",
+ "password": "Customer@123456"
 }
 ```
 
@@ -91,19 +91,19 @@ Tài liệu này ghi lại danh sách tất cả các API đã phát triển tro
 **Response Success (`200 OK`):**
 ```json
 {
-  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "user": {
-    "id": 5,
-    "roleId": 1,
-    "fullName": "Nguyễn Văn Khách Hàng",
-    "email": "customer@selfstorage.com",
-    "phone": "0900000005",
-    "status": "ACTIVE",
-    "lastLoginAt": "2026-09-16T14:30:00.000Z",
-    "createdAt": "2026-09-16T14:24:00.000Z",
-    "updatedAt": "2026-09-16T14:30:00.000Z",
-    "role": "STORAGE_CUSTOMER"
-  }
+ "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+ "user": {
+ "id": 5,
+ "roleId": 1,
+ "fullName": "Nguyễn Văn Khách Hàng",
+ "email": "customer@selfstorage.com",
+ "phone": "0900000005",
+ "status": "ACTIVE",
+ "lastLoginAt": "2026-09-16T14:30:00.000Z",
+ "createdAt": "2026-09-16T14:24:00.000Z",
+ "updatedAt": "2026-09-16T14:30:00.000Z",
+ "role": "STORAGE_CUSTOMER"
+ }
 }
 ```
 
@@ -122,13 +122,13 @@ Tài liệu này ghi lại danh sách tất cả các API đã phát triển tro
 **Response Success (`200 OK`):**
 ```json
 {
-  "message": "Logged out successfully"
+ "message": "Logged out successfully"
 }
 ```
 
 ---
 
-### 🏢 NHÓM 2: FACILITY / CƠ SỞ KHO
+### NHÓM 2: FACILITY / CƠ SỞ KHO
 
 #### 3.5. Lấy danh sách cơ sở kho (Get Facilities)
 - **Method**: `GET`
@@ -139,19 +139,19 @@ Tài liệu này ghi lại danh sách tất cả các API đã phát triển tro
 **Response Success (`200 OK`):**
 ```json
 [
-  {
-    "id": 1,
-    "name": "Self Storage Facility Alpha",
-    "code": "FAC_ALPHA",
-    "description": "Alpha facility located in District 1",
-    "phone": "0901112222",
-    "email": "alpha@selfstorage.com",
-    "address": "123 Nguyen Hue, District 1, HCMC",
-    "status": "ACTIVE",
-    "totalUnits": 20,
-    "availableUnits": 15,
-    "totalUnitTypes": 3
-  }
+ {
+ "id": 1,
+ "name": "Self Storage Facility Alpha",
+ "code": "FAC_ALPHA",
+ "description": "Alpha facility located in District 1",
+ "phone": "0901112222",
+ "email": "alpha@selfstorage.com",
+ "address": "123 Nguyen Hue, District 1, HCMC",
+ "status": "ACTIVE",
+ "totalUnits": 20,
+ "availableUnits": 15,
+ "totalUnitTypes": 3
+ }
 ]
 ```
 
@@ -169,13 +169,13 @@ Tài liệu này ghi lại danh sách tất cả các API đã phát triển tro
 **Request Body:**
 ```json
 {
-  "name": "Self Storage Facility Alpha",
-  "code": "FAC_ALPHA",
-  "description": "Optional description",
-  "phone": "0901112222",
-  "email": "alpha@selfstorage.com",
-  "address": "123 Nguyen Hue, District 1, HCMC",
-  "status": "ACTIVE"
+ "name": "Self Storage Facility Alpha",
+ "code": "FAC_ALPHA",
+ "description": "Optional description",
+ "phone": "0901112222",
+ "email": "alpha@selfstorage.com",
+ "address": "123 Nguyen Hue, District 1, HCMC",
+ "status": "ACTIVE"
 }
 ```
 
@@ -187,7 +187,7 @@ Tài liệu này ghi lại danh sách tất cả các API đã phát triển tro
 
 ---
 
-### 📦 NHÓM 3: STORAGE UNIT TYPES / LOẠI KHO
+### NHÓM 3: STORAGE UNIT TYPES / LOẠI KHO
 
 #### 3.9. Lấy danh sách loại kho
 - **Method**: `GET`
@@ -198,24 +198,24 @@ Tài liệu này ghi lại danh sách tất cả các API đã phát triển tro
 **Response Success (`200 OK`):**
 ```json
 [
-  {
-    "id": 1,
-    "facilityId": 1,
-    "name": "Small Unit (2.5m2)",
-    "code": "TYPE_S",
-    "description": "Perfect for boxes and luggage",
-    "size": "2.50",
-    "sizeUnit": "m2",
-    "depositAmount": "500000.00",
-    "status": "ACTIVE",
-    "facility": {
-      "id": 1,
-      "name": "Self Storage Facility Alpha",
-      "code": "FAC_ALPHA"
-    },
-    "totalUnits": 10,
-    "availableUnits": 8
-  }
+ {
+ "id": 1,
+ "facilityId": 1,
+ "name": "Small Unit (2.5m2)",
+ "code": "TYPE_S",
+ "description": "Perfect for boxes and luggage",
+ "size": "2.50",
+ "sizeUnit": "m2",
+ "depositAmount": "500000.00",
+ "status": "ACTIVE",
+ "facility": {
+ "id": 1,
+ "name": "Self Storage Facility Alpha",
+ "code": "FAC_ALPHA"
+ },
+ "totalUnits": 10,
+ "availableUnits": 8
+ }
 ]
 ```
 
@@ -233,14 +233,14 @@ Tài liệu này ghi lại danh sách tất cả các API đã phát triển tro
 **Request Body:**
 ```json
 {
-  "facilityId": 1,
-  "name": "Small Unit (2.5m2)",
-  "code": "TYPE_S",
-  "description": "Small unit",
-  "size": 2.5,
-  "sizeUnit": "m2",
-  "depositAmount": 500000,
-  "status": "ACTIVE"
+ "facilityId": 1,
+ "name": "Small Unit (2.5m2)",
+ "code": "TYPE_S",
+ "description": "Small unit",
+ "size": 2.5,
+ "sizeUnit": "m2",
+ "depositAmount": 500000,
+ "status": "ACTIVE"
 }
 ```
 
@@ -252,16 +252,16 @@ Tài liệu này ghi lại danh sách tất cả các API đã phát triển tro
 
 ---
 
-### 🚪 NHÓM 4: STORAGE UNITS / NGĂN KHO CHI TIẾT
+### NHÓM 4: STORAGE UNITS / NGĂN KHO CHI TIẾT
 
 #### 3.13. Lấy danh sách ngăn kho (Có bộ lọc)
 - **Method**: `GET`
 - **Endpoint**: `/storage-units`
 - **Yêu cầu Auth**: **Không (Public - Guest & User đều xem được)**
 - **Query Params**:
-  - `facilityId` (optional - số nguyên)
-  - `unitTypeId` (optional - số nguyên)
-  - `status` (optional: `AVAILABLE`, `RESERVED`, `OCCUPIED`, `UNDER_MAINTENANCE`, `OUT_OF_SERVICE`)
+ - `facilityId` (optional - số nguyên)
+ - `unitTypeId` (optional - số nguyên)
+ - `status` (optional: `AVAILABLE`, `RESERVED`, `OCCUPIED`, `UNDER_MAINTENANCE`, `OUT_OF_SERVICE`)
 
 **Ví dụ gọi:**
 - `/storage-units?facilityId=1`
@@ -272,28 +272,28 @@ Tài liệu này ghi lại danh sách tất cả các API đã phát triển tro
 **Response Success (`200 OK`):**
 ```json
 [
-  {
-    "id": 1,
-    "facilityId": 1,
-    "unitTypeId": 1,
-    "unitNumber": "A-101",
-    "floor": "1st Floor",
-    "status": "AVAILABLE",
-    "condition": "EXCELLENT",
-    "facility": {
-      "id": 1,
-      "name": "Self Storage Facility Alpha",
-      "code": "FAC_ALPHA"
-    },
-    "unitType": {
-      "id": 1,
-      "name": "Small Unit (2.5m2)",
-      "code": "TYPE_S",
-      "size": "2.50",
-      "sizeUnit": "m2",
-      "depositAmount": "500000.00"
-    }
-  }
+ {
+ "id": 1,
+ "facilityId": 1,
+ "unitTypeId": 1,
+ "unitNumber": "A-101",
+ "floor": "1st Floor",
+ "status": "AVAILABLE",
+ "condition": "EXCELLENT",
+ "facility": {
+ "id": 1,
+ "name": "Self Storage Facility Alpha",
+ "code": "FAC_ALPHA"
+ },
+ "unitType": {
+ "id": 1,
+ "name": "Small Unit (2.5m2)",
+ "code": "TYPE_S",
+ "size": "2.50",
+ "sizeUnit": "m2",
+ "depositAmount": "500000.00"
+ }
+ }
 ]
 ```
 
@@ -308,20 +308,20 @@ Tài liệu này ghi lại danh sách tất cả các API đã phát triển tro
 - **Yêu cầu Auth**: **Bắt buộc** (`JwtAuthGuard`, `RolesGuard`)
 - **Roles cho phép**: `FACILITY_MANAGER`, `BUSINESS_OPERATIONS_MANAGER`, `SYSTEM_ADMINISTRATOR`
 - **Quy tắc kiểm tra**:
-  - `facilityId` phải tồn tại.
-  - `unitTypeId` phải tồn tại.
-  - **Bắt buộc `unitType.facilityId === StorageUnit.facilityId`** (loại kho phải thuộc đúng cơ sở chỉ định, nếu không trả lỗi `400 Bad Request`).
-  - `unitNumber` không được trùng trong cùng 1 cơ sở (`409 Conflict`).
+ - `facilityId` phải tồn tại.
+ - `unitTypeId` phải tồn tại.
+ - **Bắt buộc `unitType.facilityId === StorageUnit.facilityId`** (loại kho phải thuộc đúng cơ sở chỉ định, nếu không trả lỗi `400 Bad Request`).
+ - `unitNumber` không được trùng trong cùng 1 cơ sở (`409 Conflict`).
 
 **Request Body:**
 ```json
 {
-  "facilityId": 1,
-  "unitTypeId": 1,
-  "unitNumber": "A-101",
-  "floor": "1st Floor",
-  "status": "AVAILABLE",
-  "condition": "GOOD"
+ "facilityId": 1,
+ "unitTypeId": 1,
+ "unitNumber": "A-101",
+ "floor": "1st Floor",
+ "status": "AVAILABLE",
+ "condition": "GOOD"
 }
 ```
 
@@ -333,54 +333,54 @@ Tài liệu này ghi lại danh sách tất cả các API đã phát triển tro
 
 ---
 
-### 📅 NHÓM 5: RESERVATIONS / ĐẶT CHỖ THUÊ KHO
+### NHÓM 5: RESERVATIONS / ĐẶT CHỖ THUÊ KHO
 
 #### 3.17. Kiểm tra tính khả dụng và dự toán giá kho (Check Availability)
 - **Method**: `GET`
 - **Endpoint**: `/reservations/availability`
 - **Yêu cầu Auth**: **Bắt buộc** (`JwtAuthGuard`)
 - **Query Params**:
-  - `facilityId` (bắt buộc - số nguyên)
-  - `unitTypeId` (bắt buộc - số nguyên)
-  - `appointmentDate` (optional - ISO Date string)
-  - `rentalPeriod` (optional - số nguyên >= 1)
-  - `rentalPeriodUnit` (optional: `DAYS`, `WEEKS`, `MONTHS`, `YEARS` - mặc định: `MONTHS`)
+ - `facilityId` (bắt buộc - số nguyên)
+ - `unitTypeId` (bắt buộc - số nguyên)
+ - `appointmentDate` (optional - ISO Date string)
+ - `rentalPeriod` (optional - số nguyên >= 1)
+ - `rentalPeriodUnit` (optional: `DAYS`, `WEEKS`, `MONTHS`, `YEARS` - mặc định: `MONTHS`)
 - **Ví dụ gọi**: `/reservations/availability?facilityId=1&unitTypeId=1&rentalPeriod=3`
 
 **Response Success (`200 OK`):**
 ```json
 {
-  "facility": {
-    "id": 1,
-    "name": "Self Storage Facility Alpha",
-    "code": "FAC_ALPHA",
-    "address": "123 Nguyen Hue, District 1, HCMC",
-    "phone": "0901112222",
-    "email": "alpha@selfstorage.com"
-  },
-  "unitType": {
-    "id": 1,
-    "name": "Small Unit (2.5m2)",
-    "code": "TYPE_S",
-    "size": "2.50",
-    "sizeUnit": "m2",
-    "depositAmount": "500000.00"
-  },
-  "availableCount": 5,
-  "availableUnits": [
-    {
-      "id": 1,
-      "unitNumber": "A-101",
-      "floor": "1st Floor",
-      "status": "AVAILABLE",
-      "condition": "GOOD"
-    }
-  ],
-  "pricing": {
-    "rentalPricePerPeriod": "1000000.00",
-    "depositAmount": "500000.00",
-    "estimatedTotal": "3500000.00"
-  }
+ "facility": {
+ "id": 1,
+ "name": "Self Storage Facility Alpha",
+ "code": "FAC_ALPHA",
+ "address": "123 Nguyen Hue, District 1, HCMC",
+ "phone": "0901112222",
+ "email": "alpha@selfstorage.com"
+ },
+ "unitType": {
+ "id": 1,
+ "name": "Small Unit (2.5m2)",
+ "code": "TYPE_S",
+ "size": "2.50",
+ "sizeUnit": "m2",
+ "depositAmount": "500000.00"
+ },
+ "availableCount": 5,
+ "availableUnits": [
+ {
+ "id": 1,
+ "unitNumber": "A-101",
+ "floor": "1st Floor",
+ "status": "AVAILABLE",
+ "condition": "GOOD"
+ }
+ ],
+ "pricing": {
+ "rentalPricePerPeriod": "1000000.00",
+ "depositAmount": "500000.00",
+ "estimatedTotal": "3500000.00"
+ }
 }
 ```
 
@@ -390,75 +390,75 @@ Tài liệu này ghi lại danh sách tất cả các API đã phát triển tro
 - **Yêu cầu Auth**: **Bắt buộc** (`JwtAuthGuard`, `RolesGuard`)
 - **Roles cho phép**: `STORAGE_CUSTOMER`
 - **Quy tắc & Cơ chế bảo vệ**:
-  - `facilityId` và `unitTypeId` phải tồn tại, đang `ACTIVE` và liên kết hợp lệ với nhau.
-  - `appointmentDate` phải là ngày hợp lệ và không được nằm trong quá khứ.
-  - `rentalPeriod` phải là số nguyên >= 1.
-  - **Chống Double Booking / Race condition**: Sử dụng `prisma.$transaction` kết hợp kiểm tra khóa nguyên tử `status: AVAILABLE -> RESERVED`.
-  - Tự động sinh mã `reservationCode` duy nhất định dạng `RSV-YYYYMMDD-XXXXXX`.
-  - Lấy `customerId` tự động từ `@CurrentUser()`, cấm truyền `customerId` qua body.
+ - `facilityId` và `unitTypeId` phải tồn tại, đang `ACTIVE` và liên kết hợp lệ với nhau.
+ - `appointmentDate` phải là ngày hợp lệ và không được nằm trong quá khứ.
+ - `rentalPeriod` phải là số nguyên >= 1.
+ - **Chống Double Booking / Race condition**: Sử dụng `prisma.$transaction` kết hợp kiểm tra khóa nguyên tử `status: AVAILABLE -> RESERVED`.
+ - Tự động sinh mã `reservationCode` duy nhất định dạng `RSV-YYYYMMDD-XXXXXX`.
+ - Lấy `customerId` tự động từ `@CurrentUser()`, cấm truyền `customerId` qua body.
 
 **Request Body:**
 ```json
 {
-  "facilityId": 1,
-  "unitTypeId": 1,
-  "appointmentDate": "2026-10-01T09:00:00.000Z",
-  "rentalPeriod": 3,
-  "rentalPeriodUnit": "MONTHS",
-  "notes": "Cần kiểm tra kho trước khi nhận"
+ "facilityId": 1,
+ "unitTypeId": 1,
+ "appointmentDate": "2026-10-01T09:00:00.000Z",
+ "rentalPeriod": 3,
+ "rentalPeriodUnit": "MONTHS",
+ "notes": "Cần kiểm tra kho trước khi nhận"
 }
 ```
 
 **Response Success (`201 Created`):**
 ```json
 {
-  "id": 1,
-  "reservationCode": "RSV-20260918-A1B2C3",
-  "customerId": 5,
-  "facilityId": 1,
-  "rentalPeriod": 3,
-  "rentalPeriodUnit": "MONTHS",
-  "appointmentDate": "2026-10-01T09:00:00.000Z",
-  "status": "PENDING",
-  "totalAmount": "3500000.00",
-  "createdAt": "2026-09-18T18:40:00.000Z",
-  "updatedAt": "2026-09-18T18:40:00.000Z",
-  "facility": {
-    "id": 1,
-    "name": "Self Storage Facility Alpha",
-    "code": "FAC_ALPHA",
-    "address": "123 Nguyen Hue, District 1, HCMC"
-  },
-  "items": [
-    {
-      "id": 1,
-      "reservationId": 1,
-      "unitTypeId": 1,
-      "unitId": 1,
-      "price": "1000000.00",
-      "depositAmount": "500000.00",
-      "unitType": {
-        "id": 1,
-        "name": "Small Unit (2.5m2)",
-        "code": "TYPE_S",
-        "size": "2.50",
-        "sizeUnit": "m2",
-        "depositAmount": "500000.00"
-      },
-      "unit": {
-        "id": 1,
-        "unitNumber": "A-101",
-        "floor": "1st Floor",
-        "status": "RESERVED"
-      }
-    }
-  ],
-  "customer": {
-    "id": 5,
-    "fullName": "Nguyễn Văn Khách Hàng",
-    "email": "customer@selfstorage.com",
-    "phone": "0900000005"
-  }
+ "id": 1,
+ "reservationCode": "RSV-20260918-A1B2C3",
+ "customerId": 5,
+ "facilityId": 1,
+ "rentalPeriod": 3,
+ "rentalPeriodUnit": "MONTHS",
+ "appointmentDate": "2026-10-01T09:00:00.000Z",
+ "status": "PENDING",
+ "totalAmount": "3500000.00",
+ "createdAt": "2026-09-18T18:40:00.000Z",
+ "updatedAt": "2026-09-18T18:40:00.000Z",
+ "facility": {
+ "id": 1,
+ "name": "Self Storage Facility Alpha",
+ "code": "FAC_ALPHA",
+ "address": "123 Nguyen Hue, District 1, HCMC"
+ },
+ "items": [
+ {
+ "id": 1,
+ "reservationId": 1,
+ "unitTypeId": 1,
+ "unitId": 1,
+ "price": "1000000.00",
+ "depositAmount": "500000.00",
+ "unitType": {
+ "id": 1,
+ "name": "Small Unit (2.5m2)",
+ "code": "TYPE_S",
+ "size": "2.50",
+ "sizeUnit": "m2",
+ "depositAmount": "500000.00"
+ },
+ "unit": {
+ "id": 1,
+ "unitNumber": "A-101",
+ "floor": "1st Floor",
+ "status": "RESERVED"
+ }
+ }
+ ],
+ "customer": {
+ "id": 5,
+ "fullName": "Nguyễn Văn Khách Hàng",
+ "email": "customer@selfstorage.com",
+ "phone": "0900000005"
+ }
 }
 ```
 
@@ -467,64 +467,64 @@ Tài liệu này ghi lại danh sách tất cả các API đã phát triển tro
 - **Endpoint**: `/reservations`
 - **Yêu cầu Auth**: **Bắt buộc** (`JwtAuthGuard`)
 - **Phân quyền (Ownership & RBAC)**:
-  - Khách hàng (`STORAGE_CUSTOMER`): **Chỉ xem được danh sách đơn của chính mình**.
-  - Nhân viên / Quản lý / Admin: Được xem toàn bộ đơn, có thể lọc theo `customerId`, `facilityId`, `status`.
+ - Khách hàng (`STORAGE_CUSTOMER`): **Chỉ xem được danh sách đơn của chính mình**.
+ - Nhân viên / Quản lý / Admin: Được xem toàn bộ đơn, có thể lọc theo `customerId`, `facilityId`, `status`.
 - **Query Params**:
-  - `page` (optional - mặc định: 1)
-  - `limit` (optional - mặc định: 10)
-  - `status` (optional: `PENDING`, `CONFIRMED`, `CANCELLED`, `COMPLETED`, `EXPIRED`)
-  - `facilityId` (optional - dành cho Staff/Manager/Admin)
-  - `customerId` (optional - dành cho Staff/Manager/Admin)
-  - `search` (optional - tìm kiếm nhanh theo SĐT, họ tên, email hoặc mã đơn `reservationCode`)
-  - `phone` (optional - tìm kiếm đích danh theo số điện thoại khách hàng)
+ - `page` (optional - mặc định: 1)
+ - `limit` (optional - mặc định: 10)
+ - `status` (optional: `PENDING`, `CONFIRMED`, `CANCELLED`, `COMPLETED`, `EXPIRED`)
+ - `facilityId` (optional - dành cho Staff/Manager/Admin)
+ - `customerId` (optional - dành cho Staff/Manager/Admin)
+ - `search` (optional - tìm kiếm nhanh theo SĐT, họ tên, email hoặc mã đơn `reservationCode`)
+ - `phone` (optional - tìm kiếm đích danh theo số điện thoại khách hàng)
 - **Ví dụ gọi**:
-  - `/reservations?page=1&limit=10&status=PENDING`
-  - `/reservations?search=0901234567` (Tìm theo số điện thoại hoặc mã đơn)
+ - `/reservations?page=1&limit=10&status=PENDING`
+ - `/reservations?search=0901234567` (Tìm theo số điện thoại hoặc mã đơn)
 
 **Response Success (`200 OK`):**
 ```json
 {
-  "data": [
-    {
-      "id": 1,
-      "reservationCode": "RSV-20260918-A1B2C3",
-      "customerId": 5,
-      "facilityId": 1,
-      "rentalPeriod": 3,
-      "rentalPeriodUnit": "MONTHS",
-      "appointmentDate": "2026-10-01T09:00:00.000Z",
-      "status": "PENDING",
-      "totalAmount": "3500000.00",
-      "createdAt": "2026-09-18T18:40:00.000Z",
-      "facility": {
-        "id": 1,
-        "name": "Self Storage Facility Alpha",
-        "code": "FAC_ALPHA",
-        "address": "123 Nguyen Hue, District 1, HCMC"
-      },
-      "items": [
-        {
-          "unitType": {
-            "id": 1,
-            "name": "Small Unit (2.5m2)",
-            "code": "TYPE_S"
-          },
-          "unit": {
-            "id": 1,
-            "unitNumber": "A-101",
-            "floor": "1st Floor",
-            "status": "RESERVED"
-          }
-        }
-      ]
-    }
-  ],
-  "pagination": {
-    "total": 1,
-    "page": 1,
-    "limit": 10,
-    "totalPages": 1
-  }
+ "data": [
+ {
+ "id": 1,
+ "reservationCode": "RSV-20260918-A1B2C3",
+ "customerId": 5,
+ "facilityId": 1,
+ "rentalPeriod": 3,
+ "rentalPeriodUnit": "MONTHS",
+ "appointmentDate": "2026-10-01T09:00:00.000Z",
+ "status": "PENDING",
+ "totalAmount": "3500000.00",
+ "createdAt": "2026-09-18T18:40:00.000Z",
+ "facility": {
+ "id": 1,
+ "name": "Self Storage Facility Alpha",
+ "code": "FAC_ALPHA",
+ "address": "123 Nguyen Hue, District 1, HCMC"
+ },
+ "items": [
+ {
+ "unitType": {
+ "id": 1,
+ "name": "Small Unit (2.5m2)",
+ "code": "TYPE_S"
+ },
+ "unit": {
+ "id": 1,
+ "unitNumber": "A-101",
+ "floor": "1st Floor",
+ "status": "RESERVED"
+ }
+ }
+ ]
+ }
+ ],
+ "pagination": {
+ "total": 1,
+ "page": 1,
+ "limit": 10,
+ "totalPages": 1
+ }
 }
 ```
 
@@ -539,16 +539,16 @@ Tài liệu này ghi lại danh sách tất cả các API đã phát triển tro
 - **Endpoint**: `/reservations/:id`
 - **Yêu cầu Auth**: **Bắt buộc** (`JwtAuthGuard`)
 - **Quy tắc**:
-  - Không được sửa đơn đã ở trạng thái `CANCELLED`, `COMPLETED`, hoặc `EXPIRED`.
-  - Nếu thay đổi `rentalPeriod`, hệ thống tự động tính toán lại `totalAmount`.
-  - Cấm thay đổi các trường cố định: `customerId`, `facilityId`, `reservationCode`, `unitTypeId`.
+ - Không được sửa đơn đã ở trạng thái `CANCELLED`, `COMPLETED`, hoặc `EXPIRED`.
+ - Nếu thay đổi `rentalPeriod`, hệ thống tự động tính toán lại `totalAmount`.
+ - Cấm thay đổi các trường cố định: `customerId`, `facilityId`, `reservationCode`, `unitTypeId`.
 
 **Request Body (chỉ truyền các trường cần đổi):**
 ```json
 {
-  "appointmentDate": "2026-10-05T14:00:00.000Z",
-  "rentalPeriod": 6,
-  "rentalPeriodUnit": "MONTHS"
+ "appointmentDate": "2026-10-05T14:00:00.000Z",
+ "rentalPeriod": 6,
+ "rentalPeriodUnit": "MONTHS"
 }
 ```
 
@@ -557,37 +557,37 @@ Tài liệu này ghi lại danh sách tất cả các API đã phát triển tro
 - **Endpoint**: `/reservations/:id/cancel`
 - **Yêu cầu Auth**: **Bắt buộc** (`JwtAuthGuard`)
 - **Quy tắc & Cơ chế hoàn trả kho**:
-  - Customer chỉ hủy được đơn của chính mình.
-  - Không cho phép hủy đơn đã `CANCELLED`, `COMPLETED`, hoặc `EXPIRED`.
-  - **Giải phóng kho trong Transaction**: Chuyển trạng thái kho tương ứng từ `RESERVED` trở về `AVAILABLE` ngay lập tức.
-  - Cập nhật trạng thái `Reservation.status = CANCELLED`.
+ - Customer chỉ hủy được đơn của chính mình.
+ - Không cho phép hủy đơn đã `CANCELLED`, `COMPLETED`, hoặc `EXPIRED`.
+ - **Giải phóng kho trong Transaction**: Chuyển trạng thái kho tương ứng từ `RESERVED` trở về `AVAILABLE` ngay lập tức.
+ - Cập nhật trạng thái `Reservation.status = CANCELLED`.
 
 **Request Body (Optional):**
 ```json
 {
-  "reason": "Thay đổi kế hoạch kinh doanh"
+ "reason": "Thay đổi kế hoạch kinh doanh"
 }
 ```
 
 **Response Success (`200 OK`):**
 ```json
 {
-  "id": 1,
-  "reservationCode": "RSV-20260918-A1B2C3",
-  "status": "CANCELLED",
-  "items": [
-    {
-      "unit": {
-        "id": 1,
-        "unitNumber": "A-101",
-        "status": "AVAILABLE"
-      }
-    }
-  ]
+ "id": 1,
+ "reservationCode": "RSV-20260918-A1B2C3",
+ "status": "CANCELLED",
+ "items": [
+ {
+ "unit": {
+ "id": 1,
+ "unitNumber": "A-101",
+ "status": "AVAILABLE"
+ }
+ }
+ ]
 }
 ```
 
-### 🤝 NHÓM 5: HANDOVER & CHECK-IN / BÀN GIAO KHO (FLOW 2)
+### NHÓM 5: HANDOVER & CHECK-IN / BÀN GIAO KHO (FLOW 2)
 
 #### 3.23. Tra cứu thông tin đơn để chuẩn bị Check-in (Get Reservation For Check-in)
 - **Method**: `GET`
@@ -600,57 +600,57 @@ Tài liệu này ghi lại danh sách tất cả các API đã phát triển tro
 **Response Success (`200 OK`):**
 ```json
 {
-  "id": 1,
-  "reservationCode": "RSV-20260918-A1B2C3",
-  "customerId": 5,
-  "facilityId": 1,
-  "rentalPeriod": 3,
-  "rentalPeriodUnit": "MONTHS",
-  "appointmentDate": "2026-10-01T09:00:00.000Z",
-  "status": "PENDING",
-  "totalAmount": "3500000.00",
-  "createdAt": "2026-09-18T18:40:00.000Z",
-  "facility": {
-    "id": 1,
-    "name": "Self Storage Facility Alpha",
-    "code": "FAC_ALPHA",
-    "address": "123 Nguyen Hue, District 1, HCMC",
-    "phone": "0901112222",
-    "email": "alpha@selfstorage.com"
-  },
-  "customer": {
-    "id": 5,
-    "fullName": "Nguyễn Văn Khách Hàng",
-    "email": "customer@selfstorage.com",
-    "phone": "0900000005",
-    "status": "ACTIVE"
-  },
-  "items": [
-    {
-      "id": 1,
-      "reservationId": 1,
-      "unitTypeId": 1,
-      "unitId": 1,
-      "price": "1000000.00",
-      "depositAmount": "500000.00",
-      "unitType": {
-        "id": 1,
-        "name": "Small Unit (2.5m2)",
-        "code": "TYPE_S",
-        "size": "2.50",
-        "sizeUnit": "m2",
-        "depositAmount": "500000.00"
-      },
-      "unit": {
-        "id": 1,
-        "unitNumber": "A-101",
-        "floor": "1st Floor",
-        "status": "RESERVED",
-        "condition": "GOOD"
-      }
-    }
-  ],
-  "rentalContract": null
+ "id": 1,
+ "reservationCode": "RSV-20260918-A1B2C3",
+ "customerId": 5,
+ "facilityId": 1,
+ "rentalPeriod": 3,
+ "rentalPeriodUnit": "MONTHS",
+ "appointmentDate": "2026-10-01T09:00:00.000Z",
+ "status": "PENDING",
+ "totalAmount": "3500000.00",
+ "createdAt": "2026-09-18T18:40:00.000Z",
+ "facility": {
+ "id": 1,
+ "name": "Self Storage Facility Alpha",
+ "code": "FAC_ALPHA",
+ "address": "123 Nguyen Hue, District 1, HCMC",
+ "phone": "0901112222",
+ "email": "alpha@selfstorage.com"
+ },
+ "customer": {
+ "id": 5,
+ "fullName": "Nguyễn Văn Khách Hàng",
+ "email": "customer@selfstorage.com",
+ "phone": "0900000005",
+ "status": "ACTIVE"
+ },
+ "items": [
+ {
+ "id": 1,
+ "reservationId": 1,
+ "unitTypeId": 1,
+ "unitId": 1,
+ "price": "1000000.00",
+ "depositAmount": "500000.00",
+ "unitType": {
+ "id": 1,
+ "name": "Small Unit (2.5m2)",
+ "code": "TYPE_S",
+ "size": "2.50",
+ "sizeUnit": "m2",
+ "depositAmount": "500000.00"
+ },
+ "unit": {
+ "id": 1,
+ "unitNumber": "A-101",
+ "floor": "1st Floor",
+ "status": "RESERVED",
+ "condition": "GOOD"
+ }
+ }
+ ],
+ "rentalContract": null
 }
 ```
 
@@ -660,109 +660,215 @@ Tài liệu này ghi lại danh sách tất cả các API đã phát triển tro
 - **Yêu cầu Auth**: **Bắt buộc** (`JwtAuthGuard`, `RolesGuard`)
 - **Roles cho phép**: `FACILITY_STAFF`, `FACILITY_MANAGER`, `BUSINESS_OPERATIONS_MANAGER`, `SYSTEM_ADMINISTRATOR`
 - **Quy tắc nghiệp vụ & Tính toàn vẹn (ACID Transaction)**:
-  1. Sử dụng đúng `unitId` đã giữ chỗ từ `ReservationItem.unitId` (không nhận `unitId` từ client).
-  2. Khóa chuyển đổi trạng thái kho vật lý: `StorageUnit.status` chuyển từ `RESERVED` ──> `OCCUPIED` (chống double check-in bằng conditional row-level update).
-  3. Tính toán `startDate` và `endDate` theo chu kỳ thuê (`DAYS`, `WEEKS`, `MONTHS`, `YEARS`).
-  4. Tự động sinh mã hợp đồng duy nhất `contractCode` (`CON-YYYYMMDD-XXXXXX`) và tạo `RentalContract` với trạng thái `ACTIVE`.
-  5. Tạo `ContractItem` tương ứng, tự động sinh mã PIN truy cập số 6 chữ số (`accessCode`) và kích hoạt `accessCodeStatus = ACTIVE`.
-  6. Lập biên bản bàn giao `HandoverRecord` (`type: CHECK_IN`, `staffId` lấy tự động từ JWT, lưu hiện trạng `condition`, ghi chú `notes`, và hình ảnh `photos`).
-  7. Chuyển trạng thái đơn đặt chỗ: `Reservation.status` chuyển sang `COMPLETED`.
+ 1. Sử dụng đúng `unitId` đã giữ chỗ từ `ReservationItem.unitId` (không nhận `unitId` từ client).
+ 2. Khóa chuyển đổi trạng thái kho vật lý: `StorageUnit.status` chuyển từ `RESERVED` ──> `OCCUPIED` (chống double check-in bằng conditional row-level update).
+ 3. Tính toán `startDate` và `endDate` theo chu kỳ thuê (`DAYS`, `WEEKS`, `MONTHS`, `YEARS`).
+ 4. Tự động sinh mã hợp đồng duy nhất `contractCode` (`CON-YYYYMMDD-XXXXXX`) và tạo `RentalContract` với trạng thái `ACTIVE`.
+ 5. Tạo `ContractItem` tương ứng, tự động sinh mã PIN truy cập số 6 chữ số (`accessCode`) và kích hoạt `accessCodeStatus = ACTIVE`.
+ 6. Lập biên bản bàn giao `HandoverRecord` (`type: CHECK_IN`, `staffId` lấy tự động từ JWT, lưu hiện trạng `condition`, ghi chú `notes`, và hình ảnh `photos`).
+ 7. Chuyển trạng thái đơn đặt chỗ: `Reservation.status` chuyển sang `COMPLETED`.
 
 **Request Body:**
 ```json
 {
-  "reservationId": 1,
-  "condition": "Kho sạch sẽ, không hư hỏng, khóa cửa hoạt động tốt",
-  "notes": "Đã bàn giao mã PIN truy cập và hướng dẫn sử dụng cửa điện tử",
-  "photos": [
-    "https://storage.example.com/photos/unit-A101-checkin-1.jpg",
-    "https://storage.example.com/photos/unit-A101-checkin-2.jpg"
-  ]
+ "reservationId": 1,
+ "condition": "Kho sạch sẽ, không hư hỏng, khóa cửa hoạt động tốt",
+ "notes": "Đã bàn giao mã PIN truy cập và hướng dẫn sử dụng cửa điện tử",
+ "photos": [
+ "https://storage.example.com/photos/unit-A101-checkin-1.jpg",
+ "https://storage.example.com/photos/unit-A101-checkin-2.jpg"
+ ]
 }
 ```
 
 **Response Success (`200 OK`):**
 ```json
 {
-  "message": "Check-in and handover completed successfully",
-  "reservation": {
-    "id": 1,
-    "reservationCode": "RSV-20260918-A1B2C3",
-    "status": "COMPLETED",
-    "facility": {
-      "id": 1,
-      "name": "Self Storage Facility Alpha",
-      "code": "FAC_ALPHA",
-      "address": "123 Nguyen Hue, District 1, HCMC"
-    },
-    "customer": {
-      "id": 5,
-      "fullName": "Nguyễn Văn Khách Hàng",
-      "email": "customer@selfstorage.com",
-      "phone": "0900000005"
-    }
-  },
-  "contract": {
-    "id": 1,
-    "contractCode": "CON-20260919-XYZ789",
-    "status": "ACTIVE",
-    "startDate": "2026-09-19T00:00:00.000Z",
-    "endDate": "2026-12-19T00:00:00.000Z",
-    "signedAt": "2026-09-19T12:00:00.000Z"
-  },
-  "contractItems": [
-    {
-      "id": 1,
-      "unitId": 1,
-      "unitNumber": "A-101",
-      "rentalPrice": "1000000.00",
-      "depositAmount": "500000.00",
-      "accessCode": "849201",
-      "accessCodeStatus": "ACTIVE",
-      "status": "ACTIVE"
-    }
-  ],
-  "handoverRecords": [
-    {
-      "id": 1,
-      "contractItemId": 1,
-      "staffId": 4,
-      "type": "CHECK_IN",
-      "condition": "Kho sạch sẽ, không hư hỏng, khóa cửa hoạt động tốt",
-      "notes": "Đã bàn giao mã PIN truy cập và hướng dẫn sử dụng cửa điện tử",
-      "inspectionDate": "2026-09-19T12:00:00.000Z"
-    }
-  ]
+ "message": "Check-in and handover completed successfully",
+ "reservation": {
+ "id": 1,
+ "reservationCode": "RSV-20260918-A1B2C3",
+ "status": "COMPLETED",
+ "facility": {
+ "id": 1,
+ "name": "Self Storage Facility Alpha",
+ "code": "FAC_ALPHA",
+ "address": "123 Nguyen Hue, District 1, HCMC"
+ },
+ "customer": {
+ "id": 5,
+ "fullName": "Nguyễn Văn Khách Hàng",
+ "email": "customer@selfstorage.com",
+ "phone": "0900000005"
+ }
+ },
+ "contract": {
+ "id": 1,
+ "contractCode": "CON-20260919-XYZ789",
+ "status": "ACTIVE",
+ "startDate": "2026-09-19T00:00:00.000Z",
+ "endDate": "2026-12-19T00:00:00.000Z",
+ "signedAt": "2026-09-19T12:00:00.000Z"
+ },
+ "contractItems": [
+ {
+ "id": 1,
+ "unitId": 1,
+ "unitNumber": "A-101",
+ "rentalPrice": "1000000.00",
+ "depositAmount": "500000.00",
+ "accessCode": "849201",
+ "accessCodeStatus": "ACTIVE",
+ "status": "ACTIVE"
+ }
+ ],
+ "handoverRecords": [
+ {
+ "id": 1,
+ "contractItemId": 1,
+ "staffId": 4,
+ "type": "CHECK_IN",
+ "condition": "Kho sạch sẽ, không hư hỏng, khóa cửa hoạt động tốt",
+ "notes": "Đã bàn giao mã PIN truy cập và hướng dẫn sử dụng cửa điện tử",
+ "inspectionDate": "2026-09-19T12:00:00.000Z"
+ }
+ ]
 }
 ```
 
 ---
 
-## 🛠️ 4. Hướng Dẫn Kế Thừa Kiến Trúc Cho Các Dev Tiếp Theo
+## 4. Flow 4: Quy Tắc Nghiệp Vụ, Biểu Phí & Thanh Toán (Business Rules & Revenue)
+
+### 4.1. Xem danh sách chính sách hệ thống (Get Policies)
+- **Method**: `GET`
+- **Endpoint**: `/operations/policies?policyType=CANCELLATION&facilityId=1`
+- **Auth**: Public
+
+### 4.2. Thiết lập chính sách mới (Create Policy)
+- **Method**: `POST`
+- **Endpoint**: `/operations/policies`
+- **Auth**: `BUSINESS_OPERATIONS_MANAGER`, `SYSTEM_ADMINISTRATOR`
+- **Body**:
+```json
+{
+ "policyType": "CANCELLATION",
+ "name": "Chính sách hoàn cọc tiêu chuẩn",
+ "description": "Hoàn 100% nếu báo trước 3 ngày",
+ "value": { "refund_100_days": 3, "refund_50_days": 1 },
+ "valueType": "JSON",
+ "effectiveFrom": "2026-01-01"
+}
+```
+
+### 4.3. Quản lý danh mục phụ phí (Fee Types & Extra Charges)
+- **`GET /operations/fee-types`**: Xem danh mục các loại phụ phí (Public).
+- **`POST /operations/fee-types`**: Tạo loại phụ phí mới (`OPERATIONS_MANAGER`, `ADMIN`).
+- **`POST /operations/extra-charges`**: Ghi nhận phụ thu cho đơn (`STAFF`, `MANAGER`, `ADMIN`).
+ ```json
+ {
+ "contractId": 1,
+ "feeTypeId": 1,
+ "amount": 200000,
+ "reason": "Phụ thu phí dọn dẹp vệ sinh kho bãi khi trả kho"
+ }
+ ```
+
+### 4.4. Quản lý khuyến mãi & Voucher (Discounts)
+- **`GET /operations/discounts`**: Danh sách voucher (`OPERATIONS_MANAGER`, `ADMIN`).
+- **`POST /operations/discounts`**: Tạo voucher giảm giá (`OPERATIONS_MANAGER`, `ADMIN`).
+- **`GET /operations/discounts/validate/:code`**: Kiểm tra tính hợp lệ và giá trị giảm giá của mã voucher.
+
+*(Lưu ý: Phần Tích hợp cổng thanh toán VNPAY/PayOS/Webhook và Thống kê báo cáo doanh thu tạm hoãn để họp thống nhất thêm với team Backend)*
+
+---
+
+## 5. Flow 3: Quản Lý Kho Đang Thuê (Rented Storage Unit Management)
+
+### 5.1. Xem danh sách kho đang thuê của tôi (My Active Rented Units)
+- **Method**: `GET`
+- **Endpoint**: `/contracts/my-contracts`
+- **Auth**: `STORAGE_CUSTOMER`
+- **Dữ liệu trả về**: Danh sách hợp đồng đang hiệu lực, thông tin ngăn kho (`unitNumber`, `floor`, `facility`), tình trạng mã khóa, danh mục đồ đạc cất trong kho.
+
+### 5.2. Quản lý mã mở cửa thông minh (Smart Lock PIN & Access Logs)
+- **`GET /contracts/:contractId/units/:unitId/access-code`**: Lấy mã PIN mở kho của khách hàng.
+- **`POST /contracts/:contractId/units/:unitId/access-code/reset`**: Đổi mã PIN mở khóa mới (ngẫu nhiên hoặc chỉ định).
+- **`POST /contracts/:contractId/units/:unitId/access-logs`**: Ghi nhận sự kiện mở khóa kho (Public/IoT Gateway).
+- **`GET /contracts/:contractId/units/:unitId/access-logs`**: Xem lịch sử các lần mở cửa kho (Customer & Staff).
+- **`PATCH /contracts/:contractId/units/:unitId/access-status`**: Tạm khóa hoặc thu hồi mã PIN khẩn cấp (`STAFF`, `MANAGER`).
+
+### 5.3. Quản lý danh mục đồ đạc lưu trữ trong kho (Stored Items Inventory)
+- **`GET /contracts/:contractId/units/:unitId/items`**: Danh sách đồ đạc đang cất trong ngăn kho.
+- **`POST /contracts/:contractId/units/:unitId/items`**: Thêm đồ đạc vào kho (`name`, `category`, `quantity`, `photoUrl`, `description`).
+- **`PATCH /contracts/items/:itemId`**: Cập nhật số lượng hoặc thông tin món đồ.
+- **`DELETE /contracts/items/:itemId`**: Xóa món đồ khi khách đã mang ra khỏi kho.
+
+### 5.4. Ký và Thanh lý hợp đồng (Sign & Terminate Contract)
+- **`PATCH /contracts/:id/sign`**: Khách hàng ký điện tử xác nhận hợp đồng.
+- **`PATCH /contracts/:id/terminate`**: Thanh lý hợp đồng, thu hồi mã mở cửa và tự động giải phóng các ngăn kho về `AVAILABLE` (`MANAGER`, `ADMIN`).
+
+---
+
+## 6. Flow 5: Quản Lý Cơ Sở Kho & Nhân Viên (Facility & Staff Management)
+
+### 6.1. Quản lý thông tin cơ sở (Facilities CRUD)
+- **`GET /facilities`** (Public): Danh sách cơ sở kho kèm `totalUnits`, `availableUnits`.
+- **`GET /facilities/:id`** (Public): Chi tiết cơ sở, danh sách loại kho.
+- **`POST /facilities`** (`MANAGER`, `OPERATIONS_MANAGER`, `ADMIN`): Tạo cơ sở mới.
+- **`PATCH /facilities/:id`** (`MANAGER`, `OPERATIONS_MANAGER`, `ADMIN`): Cập nhật cơ sở.
+
+### 6.2. Phân công nhân viên vào cơ sở (Staff Assignment)
+- **`POST /facilities/:id/staff`** (`MANAGER`, `OPERATIONS_MANAGER`, `ADMIN`): Phân công nhân viên vào cơ sở.
+ ```json
+ {
+ "userId": 2,
+ "position": "RECEPTIONIST"
+ }
+ ```
+ *Các vị trí (`position`): `RECEPTIONIST`, `SECURITY`, `CLEANER`, `TECHNICIAN`, `SUPERVISOR`.*
+- **`GET /facilities/:id/staff`** (`STAFF`, `MANAGER`, `ADMIN`): Xem danh sách nhân viên đang hoạt động tại cơ sở.
+- **`GET /facilities/:id/staff?includeEnded=true`**: Bao gồm cả nhân viên đã kết thúc phân công.
+- **`PATCH /facilities/staff-assignments/:assignmentId/end`** (`MANAGER`, `ADMIN`): Kết thúc phân công, ghi nhận ngày rời cơ sở.
+
+### 6.3. Sơ đồ ngăn kho (Storage Layout)
+- **`GET /facilities/:id/storage-layout`** (`STAFF`, `MANAGER`, `ADMIN`): Trả về sơ đồ ngăn kho nhóm theo tầng, tình trạng từng ngăn (AVAILABLE/OCCUPIED/RESERVED/MAINTENANCE), tỷ lệ lấp đầy (Occupancy Rate %).
+
+### 6.4. Yêu cầu hỗ trợ tại cơ sở (Support Requests)
+- **`GET /facilities/:id/support-requests`** (`STAFF`, `MANAGER`, `ADMIN`): Danh sách ticket hỗ trợ tại cơ sở.
+- **`GET /facilities/:id/support-requests?status=OPEN&priority=HIGH`**: Lọc theo trạng thái và mức ưu tiên.
+- **`PATCH /facilities/support-requests/:requestId/assign`** (`MANAGER`, `ADMIN`): Phân công nhân viên xử lý ticket.
+ ```json
+ { "staffId": 2 }
+ ```
+
+---
+
+## 7. Hướng Dẫn Kế Thừa Kiến Trúc Cho Các Dev Tiếp Theo
 
 Khi xây dựng các module nghiệp vụ tiếp theo (Contract, Payment, Support, v.v.):
 
 1. **Bảo vệ API yêu cầu đăng nhập**:
-   ```typescript
-   @UseGuards(JwtAuthGuard)
-   ```
+ ```typescript
+ @UseGuards(JwtAuthGuard)
+ ```
 2. **Cho phép API công khai (Public)**:
-   ```typescript
-   @Public()
-   @Get('something-public')
-   ```
+ ```typescript
+ @Public()
+ @Get('something-public')
+ ```
 3. **Bảo vệ API theo Role (RBAC)**:
-   ```typescript
-   @UseGuards(JwtAuthGuard, RolesGuard)
-   @Roles(UserRole.FACILITY_MANAGER, UserRole.SYSTEM_ADMINISTRATOR)
-   ```
+ ```typescript
+ @UseGuards(JwtAuthGuard, RolesGuard)
+ @Roles(UserRole.FACILITY_MANAGER, UserRole.SYSTEM_ADMINISTRATOR)
+ ```
 4. **Lấy User hiện tại trong Controller**:
-   ```typescript
-   @Get('something')
-   async handleSomething(@CurrentUser() user: any) {
-     const userId = user.id;
-   }
-   ```
+ ```typescript
+ @Get('something')
+ async handleSomething(@CurrentUser() user: any) {
+ const userId = user.id;
+ }
+ ```
 5. **Truy cập Database**: Sử dụng `PrismaService` inject từ `DatabaseModule`.
 
 

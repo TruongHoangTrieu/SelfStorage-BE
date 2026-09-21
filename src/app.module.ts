@@ -10,6 +10,8 @@ import { StorageUnitTypesModule } from './storage-unit-types/storage-unit-types.
 import { StorageUnitsModule } from './storage-units/storage-units.module';
 import { ReservationsModule } from './reservations/reservations.module';
 import { HandoversModule } from './handovers/handovers.module';
+import { OperationsModule } from './operations/operations.module';
+import { ContractsModule } from './contracts/contracts.module';
 
 @Module({
   imports: [
@@ -25,6 +27,8 @@ import { HandoversModule } from './handovers/handovers.module';
     StorageUnitsModule,
     ReservationsModule,
     HandoversModule,
+    OperationsModule,
+    ContractsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

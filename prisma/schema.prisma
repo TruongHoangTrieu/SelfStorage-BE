@@ -448,6 +448,8 @@ model ContractItem {
   unit            StorageUnit      @relation(fields: [unitId], references: [id], onDelete: Restrict)
   handoverRecords HandoverRecord[]
   supportRequests SupportRequest[]
+  storedItems     StoredItem[]
+  unitAccessLogs  UnitAccessLog[]
 
   @@index([contractId])
   @@index([unitId])
@@ -749,3 +751,41 @@ model SupportRequestLog {
   @@index([createdAt])
   @@map("support_request_logs")
 }
+
+// ==========================================
+// 15. STORED ITEMS & ACCESS LOGS — FLOW 3 (2 models)
+// ==========================================
+
+model StoredItem {
+  id             Int          @id @default(autoincrement()) @map("id")
+  contractItemId Int          @map("contract_item_id")
+  name           String       @map("name")
+  category       String?      @map("category")
+  quantity       Int          @default(1) @map("quantity")
+  photoUrl       String?      @map("photo_url")
+  description    String?      @map("description")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  contractItem   ContractItem @relation(fields: [contractItemId], references: [id], onDelete: Cascade)
+
+  @@index([contractItemId])
+  @@map("stored_items")
+}
+
+model UnitAccessLog {
+  id             Int          @id @default(autoincrement()) @map("id")
+  contractItemId Int          @map("contract_item_id")
+  accessCode     String?      @map("access_code")
+  accessMethod   String       @default("PIN_CODE") @map("access_method")
+  status         String       @default("SUCCESS") @map("status")
+  notes          String?      @map("notes")
+  accessedAt     DateTime     @default(now()) @map("accessed_at")
+
+  contractItem   ContractItem @relation(fields: [contractItemId], references: [id], onDelete: Cascade)
+
+  @@index([contractItemId])
+  @@index([accessedAt])
+  @@map("unit_access_logs")
+}
+

@@ -1,0 +1,1363 @@
+{
+	"info": {
+		"_postman_id": "selfstorage-flow-3-4-5",
+		"name": "SelfStorage - Flow 3, 4, 5 API Collection",
+		"description": "Bộ sưu tập Postman để test toàn bộ API của Flow 3 (Quản lý kho đang thuê), Flow 4 (Quy tắc nghiệp vụ & Biểu phí), và Flow 5 (Quản lý cơ sở & Nhân viên).\n\n**Hướng dẫn sử dụng:**\n1. Import file này vào Postman.\n2. Chạy request **Login** trước để lấy `accessToken`.\n3. Token sẽ được tự động lưu vào biến `{{accessToken}}` thông qua script.\n4. Các request khác sẽ tự động sử dụng token này.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:5000"
+		},
+		{
+			"key": "accessToken",
+			"value": ""
+		}
+	],
+	"item": [
+		{
+			"name": "AUTH (Xác thực)",
+			"item": [
+				{
+					"name": "Register Customer",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"fullName\": \"Nguyễn Văn Customer\",\n  \"email\": \"customer@test.com\",\n  \"phone\": \"0901234567\",\n  \"password\": \"Password123!\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/register",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"auth",
+								"register"
+							]
+						}
+					}
+				},
+				{
+					"name": "Login (Customer)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"if (jsonData.accessToken) {",
+									"    pm.collectionVariables.set('accessToken', jsonData.accessToken);",
+									"    console.log('Token saved!');",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"customer@test.com\",\n  \"password\": \"Password123!\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/login",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"auth",
+								"login"
+							]
+						}
+					}
+				},
+				{
+					"name": "Login (Admin / Manager)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"if (jsonData.accessToken) {",
+									"    pm.collectionVariables.set('accessToken', jsonData.accessToken);",
+									"    console.log('Admin token saved!');",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"admin@selfstorage.com\",\n  \"password\": \"Admin123!\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/auth/login",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"auth",
+								"login"
+							]
+						}
+					}
+				},
+				{
+					"name": "Get My Profile",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/auth/me",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"auth",
+								"me"
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "FLOW 4 - Quy Tắc Nghiệp Vụ & Biểu Phí",
+			"item": [
+				{
+					"name": "Policies (Chính sách)",
+					"item": [
+						{
+							"name": "Get All Policies (Public)",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/operations/policies",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"operations",
+										"policies"
+									]
+								}
+							}
+						},
+						{
+							"name": "Get Policies by Type (Filter)",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/operations/policies?policyType=CANCELLATION&facilityId=1",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"operations",
+										"policies"
+									],
+									"query": [
+										{
+											"key": "policyType",
+											"value": "CANCELLATION"
+										},
+										{
+											"key": "facilityId",
+											"value": "1"
+										}
+									]
+								}
+							}
+						},
+						{
+							"name": "Get Policy Detail",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/operations/policies/1",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"operations",
+										"policies",
+										"1"
+									]
+								}
+							}
+						},
+						{
+							"name": "Create Cancellation Policy",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"policyType\": \"CANCELLATION\",\n  \"name\": \"Chính sách hoàn cọc tiêu chuẩn\",\n  \"description\": \"Hoàn 100% nếu báo trước 3 ngày, 50% nếu 1 ngày, 0% nếu dưới 12 giờ\",\n  \"value\": {\n    \"refund_100_percent_days\": 3,\n    \"refund_50_percent_days\": 1,\n    \"refund_0_percent_hours\": 12\n  },\n  \"valueType\": \"JSON\",\n  \"effectiveFrom\": \"2026-01-01\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/operations/policies",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"operations",
+										"policies"
+									]
+								}
+							}
+						},
+						{
+							"name": "Create Deposit Policy",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"policyType\": \"DEPOSIT\",\n  \"name\": \"Chính sách đặt cọc mặc định\",\n  \"description\": \"Tỷ lệ đặt cọc 50% giá trị thuê\",\n  \"value\": {\n    \"percentage\": 50,\n    \"min_amount\": 500000\n  },\n  \"valueType\": \"JSON\",\n  \"effectiveFrom\": \"2026-01-01\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/operations/policies",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"operations",
+										"policies"
+									]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "Fee Types & Extra Charges (Phụ phí)",
+					"item": [
+						{
+							"name": "Get All Fee Types (Public)",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/operations/fee-types",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"operations",
+										"fee-types"
+									]
+								}
+							}
+						},
+						{
+							"name": "Create Fee Type (Cleaning)",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"name\": \"Phí dọn dẹp vệ sinh\",\n  \"code\": \"CLEANING_FEE\",\n  \"description\": \"Phí dọn dẹp vệ sinh kho bãi khi trả kho\",\n  \"defaultAmount\": 200000,\n  \"amountType\": \"FIXED\",\n  \"appliesTo\": \"CONTRACT\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/operations/fee-types",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"operations",
+										"fee-types"
+									]
+								}
+							}
+						},
+						{
+							"name": "Create Fee Type (Late Return)",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"name\": \"Phí phạt trễ hạn\",\n  \"code\": \"LATE_RETURN_FEE\",\n  \"description\": \"Phí phạt 5% giá thuê mỗi ngày trễ hạn\",\n  \"defaultAmount\": 5,\n  \"amountType\": \"PERCENTAGE\",\n  \"appliesTo\": \"CONTRACT\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/operations/fee-types",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"operations",
+										"fee-types"
+									]
+								}
+							}
+						},
+						{
+							"name": "Create Extra Charge for Contract",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"contractId\": 1,\n  \"feeTypeId\": 1,\n  \"amount\": 200000,\n  \"reason\": \"Phụ thu phí dọn dẹp vệ sinh kho bãi khi trả kho\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/operations/extra-charges",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"operations",
+										"extra-charges"
+									]
+								}
+							}
+						},
+						{
+							"name": "Get Extra Charges (Filter by Contract)",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/operations/extra-charges?contractId=1",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"operations",
+										"extra-charges"
+									],
+									"query": [
+										{
+											"key": "contractId",
+											"value": "1"
+										}
+									]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "Discounts (Khuyến mãi)",
+					"item": [
+						{
+							"name": "Get All Discounts",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/operations/discounts",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"operations",
+										"discounts"
+									]
+								}
+							}
+						},
+						{
+							"name": "Create Discount (10% off)",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"code\": \"WELCOME10\",\n  \"name\": \"Giảm 10% cho khách hàng mới\",\n  \"description\": \"Áp dụng cho lần thuê kho đầu tiên\",\n  \"discountType\": \"PERCENTAGE\",\n  \"value\": 10,\n  \"startDate\": \"2026-01-01\",\n  \"endDate\": \"2026-12-31\",\n  \"maxUsage\": 100\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/operations/discounts",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"operations",
+										"discounts"
+									]
+								}
+							}
+						},
+						{
+							"name": "Create Discount (Fixed 500K)",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"code\": \"SAVE500K\",\n  \"name\": \"Giảm 500.000đ cho đơn trên 3 triệu\",\n  \"description\": \"Áp dụng cho đơn thuê kho từ 3 tháng trở lên\",\n  \"discountType\": \"FIXED_AMOUNT\",\n  \"value\": 500000,\n  \"startDate\": \"2026-01-01\",\n  \"maxUsage\": 50\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/operations/discounts",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"operations",
+										"discounts"
+									]
+								}
+							}
+						},
+						{
+							"name": "Validate Discount Code",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/operations/discounts/validate/WELCOME10",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"operations",
+										"discounts",
+										"validate",
+										"WELCOME10"
+									]
+								}
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "FLOW 3 - Quản Lý Kho Đang Thuê",
+			"item": [
+				{
+					"name": "Contracts (Hợp đồng)",
+					"item": [
+						{
+							"name": "Get My Contracts (Customer)",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/contracts/my-contracts",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"contracts",
+										"my-contracts"
+									]
+								}
+							}
+						},
+						{
+							"name": "Get All Contracts (Staff/Manager)",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/contracts?status=ACTIVE",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"contracts"
+									],
+									"query": [
+										{
+											"key": "status",
+											"value": "ACTIVE"
+										}
+									]
+								}
+							}
+						},
+						{
+							"name": "Get Contract Detail",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/contracts/1",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"contracts",
+										"1"
+									]
+								}
+							}
+						},
+						{
+							"name": "Sign Contract",
+							"request": {
+								"method": "PATCH",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/contracts/1/sign",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"contracts",
+										"1",
+										"sign"
+									]
+								}
+							}
+						},
+						{
+							"name": "Terminate Contract (Manager)",
+							"request": {
+								"method": "PATCH",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/contracts/1/terminate",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"contracts",
+										"1",
+										"terminate"
+									]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "Access Code & Logs (Mã khóa & Lịch sử ra vào)",
+					"item": [
+						{
+							"name": "Get Access Code (PIN mở cửa)",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/contracts/1/units/1/access-code",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"contracts",
+										"1",
+										"units",
+										"1",
+										"access-code"
+									]
+								}
+							}
+						},
+						{
+							"name": "Reset Access Code (Đổi mã PIN)",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/contracts/1/units/1/access-code/reset",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"contracts",
+										"1",
+										"units",
+										"1",
+										"access-code",
+										"reset"
+									]
+								}
+							}
+						},
+						{
+							"name": "Record Access Log (Ghi nhận mở cửa)",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"accessCode\": \"123456\",\n  \"accessMethod\": \"PIN_CODE\",\n  \"status\": \"SUCCESS\",\n  \"notes\": \"Mở cửa bình thường\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/contracts/1/units/1/access-logs",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"contracts",
+										"1",
+										"units",
+										"1",
+										"access-logs"
+									]
+								}
+							}
+						},
+						{
+							"name": "Get Access Logs (Lịch sử ra vào)",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/contracts/1/units/1/access-logs",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"contracts",
+										"1",
+										"units",
+										"1",
+										"access-logs"
+									]
+								}
+							}
+						},
+						{
+							"name": "Update Access Status (Khóa/Mở mã)",
+							"request": {
+								"method": "PATCH",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"status\": \"REVOKED\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/contracts/1/units/1/access-status",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"contracts",
+										"1",
+										"units",
+										"1",
+										"access-status"
+									]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "Stored Items (Danh mục đồ cất kho)",
+					"item": [
+						{
+							"name": "Get Stored Items",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/contracts/1/units/1/items",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"contracts",
+										"1",
+										"units",
+										"1",
+										"items"
+									]
+								}
+							}
+						},
+						{
+							"name": "Add Stored Item",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"name\": \"Thùng hồ sơ công ty\",\n  \"category\": \"HỒ SƠ\",\n  \"quantity\": 5,\n  \"description\": \"5 thùng hồ sơ kế toán năm 2023-2025\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/contracts/1/units/1/items",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"contracts",
+										"1",
+										"units",
+										"1",
+										"items"
+									]
+								}
+							}
+						},
+						{
+							"name": "Add Stored Item (Electronics)",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"name\": \"Máy tính bàn cũ\",\n  \"category\": \"ĐIỆN TỬ\",\n  \"quantity\": 2,\n  \"description\": \"2 bộ máy tính bàn Dell Optiplex đã qua sử dụng\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/contracts/1/units/1/items",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"contracts",
+										"1",
+										"units",
+										"1",
+										"items"
+									]
+								}
+							}
+						},
+						{
+							"name": "Update Stored Item",
+							"request": {
+								"method": "PATCH",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"quantity\": 3,\n  \"description\": \"Đã mang ra 2 thùng, còn lại 3 thùng\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/contracts/items/1",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"contracts",
+										"items",
+										"1"
+									]
+								}
+							}
+						},
+						{
+							"name": "Delete Stored Item",
+							"request": {
+								"method": "DELETE",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/contracts/items/2",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"contracts",
+										"items",
+										"2"
+									]
+								}
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "FLOW 5 - Quản Lý Cơ Sở & Nhân Viên",
+			"item": [
+				{
+					"name": "Facilities (Cơ sở kho)",
+					"item": [
+						{
+							"name": "Get All Facilities (Public)",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/facilities",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"facilities"
+									]
+								}
+							}
+						},
+						{
+							"name": "Get Facility Detail (Public)",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/facilities/1",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"facilities",
+										"1"
+									]
+								}
+							}
+						},
+						{
+							"name": "Create Facility",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"name\": \"Self Storage - Chi nhánh Quận 7\",\n  \"code\": \"FAC_Q7\",\n  \"description\": \"Chi nhánh kho tại khu vực Phú Mỹ Hưng, Quận 7\",\n  \"phone\": \"028-7300-1234\",\n  \"email\": \"q7@selfstorage.vn\",\n  \"address\": \"789 Nguyễn Lương Bằng, Phú Mỹ Hưng, Quận 7, TP.HCM\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/facilities",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"facilities"
+									]
+								}
+							}
+						},
+						{
+							"name": "Update Facility",
+							"request": {
+								"method": "PATCH",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"description\": \"Chi nhánh kho lớn nhất tại khu vực Phú Mỹ Hưng, Quận 7 - Mở cửa 24/7\",\n  \"phone\": \"028-7300-5678\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/facilities/1",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"facilities",
+										"1"
+									]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "Staff Management (Phân công nhân viên)",
+					"item": [
+						{
+							"name": "Assign Staff to Facility",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"userId\": 2,\n  \"position\": \"RECEPTIONIST\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/facilities/1/staff",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"facilities",
+										"1",
+										"staff"
+									]
+								}
+							}
+						},
+						{
+							"name": "Assign Staff (Security Guard)",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"userId\": 3,\n  \"position\": \"SECURITY\"\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/facilities/1/staff",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"facilities",
+										"1",
+										"staff"
+									]
+								}
+							}
+						},
+						{
+							"name": "Get Staff at Facility (Active Only)",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/facilities/1/staff",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"facilities",
+										"1",
+										"staff"
+									]
+								}
+							}
+						},
+						{
+							"name": "Get Staff at Facility (Include Ended)",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/facilities/1/staff?includeEnded=true",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"facilities",
+										"1",
+										"staff"
+									],
+									"query": [
+										{
+											"key": "includeEnded",
+											"value": "true"
+										}
+									]
+								}
+							}
+						},
+						{
+							"name": "End Staff Assignment",
+							"request": {
+								"method": "PATCH",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/facilities/staff-assignments/1/end",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"facilities",
+										"staff-assignments",
+										"1",
+										"end"
+									]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "Storage Layout (Sơ đồ ngăn kho)",
+					"item": [
+						{
+							"name": "Get Storage Layout (Facility 1)",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/facilities/1/storage-layout",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"facilities",
+										"1",
+										"storage-layout"
+									]
+								}
+							}
+						},
+						{
+							"name": "Get Storage Layout (Facility 2)",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/facilities/2/storage-layout",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"facilities",
+										"2",
+										"storage-layout"
+									]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "Support Requests (Yêu cầu hỗ trợ tại cơ sở)",
+					"item": [
+						{
+							"name": "Get Support Requests at Facility",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/facilities/1/support-requests",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"facilities",
+										"1",
+										"support-requests"
+									]
+								}
+							}
+						},
+						{
+							"name": "Get Support Requests (Filter by Status)",
+							"request": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									}
+								],
+								"url": {
+									"raw": "{{baseUrl}}/facilities/1/support-requests?status=OPEN&priority=HIGH",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"facilities",
+										"1",
+										"support-requests"
+									],
+									"query": [
+										{
+											"key": "status",
+											"value": "OPEN"
+										},
+										{
+											"key": "priority",
+											"value": "HIGH"
+										}
+									]
+								}
+							}
+						},
+						{
+							"name": "Assign Staff to Support Request",
+							"request": {
+								"method": "PATCH",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{accessToken}}"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"staffId\": 2\n}"
+								},
+								"url": {
+									"raw": "{{baseUrl}}/facilities/support-requests/1/assign",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"facilities",
+										"support-requests",
+										"1",
+										"assign"
+									]
+								}
+							}
+						}
+					]
+				}
+			]
+		}
+	]
+}
