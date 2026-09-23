@@ -791,12 +791,27 @@ Tài liệu này ghi lại danh sách tất cả các API đã phát triển tro
 - **Auth**: `STORAGE_CUSTOMER`
 - **Dữ liệu trả về**: Danh sách hợp đồng đang hiệu lực, thông tin ngăn kho (`unitNumber`, `floor`, `facility`), tình trạng mã khóa, danh mục đồ đạc cất trong kho.
 
-### 5.2. Quản lý mã mở cửa thông minh (Smart Lock PIN & Access Logs)
-- **`GET /contracts/:contractId/units/:unitId/access-code`**: Lấy mã PIN mở kho của khách hàng.
-- **`POST /contracts/:contractId/units/:unitId/access-code/reset`**: Đổi mã PIN mở khóa mới (ngẫu nhiên hoặc chỉ định).
-- **`POST /contracts/:contractId/units/:unitId/access-logs`**: Ghi nhận sự kiện mở khóa kho (Public/IoT Gateway).
-- **`GET /contracts/:contractId/units/:unitId/access-logs`**: Xem lịch sử các lần mở cửa kho (Customer & Staff).
-- **`PATCH /contracts/:contractId/units/:unitId/access-status`**: Tạm khóa hoặc thu hồi mã PIN khẩn cấp (`STAFF`, `MANAGER`).
+### 5.2. Quản lý ổ khóa thông minh căn hộ (Smart Digital Lock)
+- **`GET /contracts/:contractId/units/:unitId/smart-lock`**: Lấy thông tin ổ khóa điện tử, mã PIN mở kho của khách hàng và hướng dẫn thao tác bàn phím (`CUSTOMER`, `STAFF`, `MANAGER`, `ADMIN`).
+- **`POST /contracts/:contractId/units/:unitId/smart-lock/change-pin`**: Khách hàng tự đổi mã PIN của ổ khóa thông minh (chuỗi 4 đến 8 chữ số) (`CUSTOMER`).
+  ```json
+  {
+    "newPin": "654321"
+  }
+  ```
+- **`POST /contracts/:contractId/units/:unitId/smart-lock/reset-pin`**: Đặt lại mã PIN ngẫu nhiên hoặc chỉ định - Master Reset PIN (`STAFF`, `MANAGER`, `ADMIN`).
+  ```json
+  {
+    "newPin": "123456"
+  }
+  ```
+- **`PATCH /contracts/:contractId/units/:unitId/smart-lock/status`**: Khóa / kích hoạt lại mã PIN của ổ khóa (`STAFF`, `MANAGER`, `ADMIN`).
+  ```json
+  {
+    "status": "REVOKED"
+  }
+  ```
+*(Lưu ý: Không sử dụng các API kết nối thiết bị IoT, hệ thống quản lý trực tiếp bằng mô hình khóa mã số thông minh căn hộ cao cấp)*
 
 ### 5.3. Quản lý danh mục đồ đạc lưu trữ trong kho (Stored Items Inventory)
 - **`GET /contracts/:contractId/units/:unitId/items`**: Danh sách đồ đạc đang cất trong ngăn kho.
@@ -844,7 +859,96 @@ Tài liệu này ghi lại danh sách tất cả các API đã phát triển tro
 
 ---
 
-## 7. Hướng Dẫn Kế Thừa Kiến Trúc Cho Các Dev Tiếp Theo
+## 7. Flow 7: Tiếp Nhận & Xử Lý Yêu Cầu Sự Cố (Support Request & Issue Handling Flow)
+
+### 7.1. Tạo ticket yêu cầu hỗ trợ sự cố mới (Create Support Request)
+- **Method**: `POST`
+- **Endpoint**: `/support/requests`
+- **Auth**: `STORAGE_CUSTOMER` (hoặc các Role khác)
+- **Body**:
+  ```json
+  {
+    "facilityId": 1,
+    "contractItemId": 1,
+    "category": "LOST_KEY",
+    "subject": "Quên mã PIN ổ khóa thông minh ngăn kho A-101",
+    "description": "Tôi đã thử nhập mã PIN nhưng khóa báo sai, cần hỗ trợ cấp lại mã.",
+    "priority": "HIGH",
+    "photos": [
+      "https://example.com/photos/lock-error.jpg"
+    ]
+  }
+  ```
+  *Phân loại sự cố (`category`):*
+  - `LOST_KEY`: Mất chìa khóa / Quên mã PIN mở cửa.
+  - `ACCESS_CODE`: Lỗi bàn phím / Không nhận mã vào cửa.
+  - `DAMAGE`: Hư hỏng thiết bị, bản lề, trầy xước, dột nước tại ngăn kho.
+  - `PAYMENT`: Khiếu nại hóa đơn, tiền cọc, sai lệch thanh toán.
+  - `LOCK`: Ổ khóa thông minh kẹt cơ học / hết pin.
+  - `UNIT`: Sự cố chung về ngăn kho.
+  - `OTHER`: Yêu cầu hỗ trợ khác.
+
+  *Mức độ ưu tiên (`priority`):* `LOW`, `MEDIUM`, `HIGH`, `URGENT` (mặc định `MEDIUM`).
+
+### 7.2. Lấy danh sách yêu cầu hỗ trợ (List Support Requests)
+- **Method**: `GET`
+- **Endpoint**: `/support/requests`
+- **Auth**: `JwtAuthGuard`
+- **Phân quyền**:
+  - `STORAGE_CUSTOMER`: Tự động chỉ xem được danh sách ticket của chính mình.
+  - `FACILITY_STAFF`, `FACILITY_MANAGER`, `ADMIN`: Xem toàn bộ ticket của cơ sở / hệ thống.
+- **Query Params**: `page`, `limit`, `facilityId`, `status`, `category`, `priority`, `search` (tìm theo mã đơn, tiêu đề, họ tên/SĐT khách hàng).
+- **Ví dụ**: `/support/requests?facilityId=1&status=OPEN&category=LOST_KEY`
+
+### 7.3. Chi tiết yêu cầu hỗ trợ & Lịch sử tiến độ (Get Ticket Details & Logs)
+- **Method**: `GET`
+- **Endpoint**: `/support/requests/:id`
+- **Auth**: `JwtAuthGuard`
+- **Dữ liệu trả về**: Thông tin ticket, danh sách ảnh đính kèm, thông tin ngăn kho, nhân viên đang phụ trách, và toàn bộ nhật ký tiến độ (`logs`) gồm thời gian, người cập nhật, trạng thái cũ -> trạng thái mới, ghi chú giải pháp.
+
+### 7.4. Phân công nhân viên tiếp nhận ticket (Assign Staff)
+- **Method**: `PATCH`
+- **Endpoint**: `/support/requests/:id/assign`
+- **Auth**: `FACILITY_MANAGER`, `BUSINESS_OPERATIONS_MANAGER`, `SYSTEM_ADMINISTRATOR`
+- **Body**:
+  ```json
+  {
+    "staffId": 3
+  }
+  ```
+- **Tác vụ tự động**: Chuyển trạng thái ticket sang `IN_PROGRESS` (nếu đang `OPEN`), tự động ghi bản ghi nhật ký `SupportRequestLog`.
+
+### 7.5. Cập nhật tiến độ & trạng thái xử lý (Update Progress & Status)
+- **Method**: `PATCH`
+- **Endpoint**: `/support/requests/:id/progress`
+- **Auth**: `FACILITY_STAFF`, `FACILITY_MANAGER`, `BUSINESS_OPERATIONS_MANAGER`, `SYSTEM_ADMINISTRATOR`
+- **Body**:
+  ```json
+  {
+    "status": "RESOLVED",
+    "note": "Đã kiểm tra ổ khóa tại chỗ và thực hiện Master Reset PIN mới cho khách hàng.",
+    "photos": [
+      "https://example.com/photos/resolved-lock.jpg"
+    ]
+  }
+  ```
+  *Trạng thái (`status`):* `OPEN`, `IN_PROGRESS`, `RESOLVED`, `CLOSED`, `CANCELLED`.
+- **Tác vụ tự động**: Khi trạng thái là `RESOLVED` hoặc `CLOSED`, tự động ghi nhận `resolvedAt`. Tự động lưu vết `SupportRequestLog`.
+
+### 7.6. Trao đổi, thêm phản hồi/ghi chú vào ticket (Add Ticket Note)
+- **Method**: `POST`
+- **Endpoint**: `/support/requests/:id/notes`
+- **Auth**: `STORAGE_CUSTOMER`, `FACILITY_STAFF`, `FACILITY_MANAGER`, `ADMIN`
+- **Body**:
+  ```json
+  {
+    "note": "Tôi đã nhận được mã PIN mới qua SMS và đã mở được kho. Cảm ơn ban quản lý."
+  }
+  ```
+
+---
+
+## 8. Hướng Dẫn Kế Thừa Kiến Trúc Cho Các Dev Tiếp Theo
 
 Khi xây dựng các module nghiệp vụ tiếp theo (Contract, Payment, Support, v.v.):
 

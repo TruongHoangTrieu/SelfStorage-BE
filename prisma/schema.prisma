@@ -715,6 +715,7 @@ model SupportRequest {
   priority        SupportPriority @default(MEDIUM) @map("priority")
   status          SupportStatus   @default(OPEN) @map("status")
   assignedStaffId Int?            @map("assigned_staff_id")
+  photos          Json?           @map("photos")
   createdAt       DateTime        @default(now()) @map("created_at")
   resolvedAt      DateTime?       @map("resolved_at")
   updatedAt       DateTime        @updatedAt @map("updated_at")

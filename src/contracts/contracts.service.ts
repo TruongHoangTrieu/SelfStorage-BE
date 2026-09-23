@@ -10,10 +10,10 @@ import {
   UpdateStoredItemDto,
 } from './dto/stored-item.dto';
 import {
-  RecordAccessLogDto,
-  ResetAccessCodeDto,
-  UpdateAccessStatusDto,
-} from './dto/access-log.dto';
+  ChangeSmartLockPinDto,
+  ResetSmartLockPinDto,
+  UpdateSmartLockStatusDto,
+} from './dto/smart-lock.dto';
 import {
   ContractStatus,
   AccessCodeStatus,
@@ -201,12 +201,17 @@ export class ContractsService {
     });
   }
 
-  // ==================== MÃ KHÓA & LỊCH SỬ RA VÀO ====================
+  // ==================== KHÓA THÔNG MINH CĂN HỘ (SMART DIGITAL LOCK) ====================
 
   /**
-   * Lấy mã PIN mở cửa ngăn kho
+   * Lấy thông tin ổ khóa điện tử và mã PIN mở cửa ngăn kho
    */
-  async getAccessCode(contractId: number, unitId: number, userId: number) {
+  async getSmartLockInfo(
+    contractId: number,
+    unitId: number,
+    userId: number,
+    userRole?: string,
+  ) {
     const contract = await this.prisma.rentalContract.findUnique({
       where: { id: contractId },
       include: {
@@ -223,8 +228,11 @@ export class ContractsService {
       throw new NotFoundException(`Hợp đồng #${contractId} không tồn tại`);
     }
 
-    if (contract.customerId !== userId) {
-      throw new ForbiddenException('Bạn không có quyền xem mã mở khóa của hợp đồng này');
+    if (
+      userRole === UserRole.STORAGE_CUSTOMER &&
+      contract.customerId !== userId
+    ) {
+      throw new ForbiddenException('Bạn không có quyền xem thông tin khóa của hợp đồng này');
     }
 
     const item = contract.contractItems[0];
@@ -237,19 +245,22 @@ export class ContractsService {
       unitId,
       unitNumber: item.unit.unitNumber,
       floor: item.unit.floor,
+      lockType: 'SMART_DIGITAL_LOCK',
+      lockModel: 'Keypad Electronic Smart Lock',
       accessCode: item.accessCode,
       accessCodeStatus: item.accessCodeStatus,
+      instructions: 'Nhập mã PIN trên bàn phím số của ổ khóa cửa kho và kết thúc bằng phím # để mở khóa.',
     };
   }
 
   /**
-   * Đổi mã PIN mở khóa mới
+   * Khách hàng tự đổi mã PIN của ổ khóa thông minh
    */
-  async resetAccessCode(
+  async changeSmartLockPin(
     contractId: number,
     unitId: number,
     userId: number,
-    dto: ResetAccessCodeDto,
+    dto: ChangeSmartLockPinDto,
   ) {
     const contract = await this.prisma.rentalContract.findUnique({
       where: { id: contractId },
@@ -266,12 +277,53 @@ export class ContractsService {
       throw new ForbiddenException('Bạn không có quyền đổi mã khóa của hợp đồng này');
     }
 
+    if (contract.status !== ContractStatus.ACTIVE) {
+      throw new BadRequestException('Chỉ có thể đổi mã PIN khi hợp đồng đang ở trạng thái ACTIVE');
+    }
+
     const item = contract.contractItems[0];
     if (!item) {
       throw new NotFoundException(`Ngăn kho #${unitId} không thuộc hợp đồng này`);
     }
 
-    const newCode = dto.newAccessCode || Math.floor(100000 + Math.random() * 900000).toString();
+    if (item.accessCodeStatus !== AccessCodeStatus.ACTIVE) {
+      throw new BadRequestException('Ổ khóa hiện đang bị tạm khóa hoặc chưa kích hoạt. Vui lòng liên hệ ban quản lý.');
+    }
+
+    const updated = await this.prisma.contractItem.update({
+      where: { id: item.id },
+      data: {
+        accessCode: dto.newPin,
+        accessCodeStatus: AccessCodeStatus.ACTIVE,
+      },
+    });
+
+    return {
+      message: 'Đổi mã PIN khóa thông minh thành công',
+      unitId,
+      accessCode: updated.accessCode,
+      accessCodeStatus: updated.accessCodeStatus,
+    };
+  }
+
+  /**
+   * Đặt lại mã PIN ngẫu nhiên hoặc theo chỉ định (Master Reset PIN dành cho Staff/Manager/Admin)
+   */
+  async resetSmartLockPin(
+    contractId: number,
+    unitId: number,
+    dto: ResetSmartLockPinDto,
+  ) {
+    const item = await this.prisma.contractItem.findFirst({
+      where: { contractId, unitId },
+    });
+
+    if (!item) {
+      throw new NotFoundException(`Không tìm thấy ngăn kho #${unitId} trong hợp đồng #${contractId}`);
+    }
+
+    const newCode =
+      dto.newPin || Math.floor(100000 + Math.random() * 900000).toString();
 
     const updated = await this.prisma.contractItem.update({
       where: { id: item.id },
@@ -282,7 +334,7 @@ export class ContractsService {
     });
 
     return {
-      message: 'Đổi mã mở khóa PIN thành công',
+      message: 'Đặt lại mã PIN khóa thông minh thành công',
       unitId,
       accessCode: updated.accessCode,
       accessCodeStatus: updated.accessCodeStatus,
@@ -290,61 +342,12 @@ export class ContractsService {
   }
 
   /**
-   * Ghi nhận sự kiện mở khóa kho (nhập mã PIN hoặc mở qua App)
+   * Tạm khóa hoặc kích hoạt lại mã mở cửa kho (Staff / Manager)
    */
-  async recordAccessLog(contractId: number, unitId: number, dto: RecordAccessLogDto) {
-    const item = await this.prisma.contractItem.findFirst({
-      where: { contractId, unitId },
-    });
-
-    if (!item) {
-      throw new NotFoundException(`Không tìm thấy ngăn kho #${unitId} trong hợp đồng #${contractId}`);
-    }
-
-    return this.prisma.unitAccessLog.create({
-      data: {
-        contractItemId: item.id,
-        accessCode: dto.accessCode,
-        accessMethod: dto.accessMethod || 'PIN_CODE',
-        status: dto.status || 'SUCCESS',
-        notes: dto.notes,
-      },
-    });
-  }
-
-  /**
-   * Xem lịch sử ra vào kho
-   */
-  async getAccessLogs(
+  async updateSmartLockStatus(
     contractId: number,
     unitId: number,
-    userId: number,
-    userRole: string,
-  ) {
-    await this.getContractAndValidateOwnership(contractId, userId, userRole);
-
-    const item = await this.prisma.contractItem.findFirst({
-      where: { contractId, unitId },
-    });
-
-    if (!item) {
-      throw new NotFoundException(`Không tìm thấy ngăn kho #${unitId} trong hợp đồng #${contractId}`);
-    }
-
-    return this.prisma.unitAccessLog.findMany({
-      where: { contractItemId: item.id },
-      orderBy: { accessedAt: 'desc' },
-      take: 50,
-    });
-  }
-
-  /**
-   * Tạm khóa hoặc mở lại mã mở cửa kho (Staff / Manager)
-   */
-  async updateAccessStatus(
-    contractId: number,
-    unitId: number,
-    dto: UpdateAccessStatusDto,
+    dto: UpdateSmartLockStatusDto,
   ) {
     const item = await this.prisma.contractItem.findFirst({
       where: { contractId, unitId },
@@ -354,10 +357,16 @@ export class ContractsService {
       throw new NotFoundException(`Không tìm thấy ngăn kho #${unitId} trong hợp đồng #${contractId}`);
     }
 
-    return this.prisma.contractItem.update({
+    const updated = await this.prisma.contractItem.update({
       where: { id: item.id },
       data: { accessCodeStatus: dto.status },
     });
+
+    return {
+      message: `Đã cập nhật trạng thái ổ khóa sang ${dto.status}`,
+      unitId,
+      accessCodeStatus: updated.accessCodeStatus,
+    };
   }
 
   // ==================== DANH MỤC LƯU TRỮ (STORED ITEMS) ====================

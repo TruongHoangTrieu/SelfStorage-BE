@@ -18,10 +18,10 @@ import {
   UpdateStoredItemDto,
 } from './dto/stored-item.dto';
 import {
-  RecordAccessLogDto,
-  ResetAccessCodeDto,
-  UpdateAccessStatusDto,
-} from './dto/access-log.dto';
+  ChangeSmartLockPinDto,
+  ResetSmartLockPinDto,
+  UpdateSmartLockStatusDto,
+} from './dto/smart-lock.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -99,57 +99,19 @@ export class ContractsController {
     return this.contractsService.terminateContract(id);
   }
 
-  // ==================== MÃ KHÓA & LỊCH SỬ RA VÀO ====================
+  // ==================== KHÓA THÔNG MINH CĂN HỘ (SMART DIGITAL LOCK) ====================
 
   /**
-   * Lấy mã PIN mở cửa ngăn kho (Khách hàng)
+   * Lấy thông tin ổ khóa điện tử và mã PIN mở cửa ngăn kho
+   * GET /contracts/:contractId/units/:unitId/smart-lock
    */
-  @Get(':contractId/units/:unitId/access-code')
-  async getAccessCode(
+  @Get(':contractId/units/:unitId/smart-lock')
+  async getSmartLockInfo(
     @Param('contractId', ParseIntPipe) contractId: number,
     @Param('unitId', ParseIntPipe) unitId: number,
     @CurrentUser() user: any,
   ) {
-    return this.contractsService.getAccessCode(contractId, unitId, user.id);
-  }
-
-  /**
-   * Đổi mã PIN mở cửa mới
-   */
-  @Post(':contractId/units/:unitId/access-code/reset')
-  async resetAccessCode(
-    @Param('contractId', ParseIntPipe) contractId: number,
-    @Param('unitId', ParseIntPipe) unitId: number,
-    @CurrentUser() user: any,
-    @Body() dto: ResetAccessCodeDto,
-  ) {
-    return this.contractsService.resetAccessCode(contractId, unitId, user.id, dto);
-  }
-
-  /**
-   * Ghi nhận sự kiện mở khóa kho (Public/IoT Gateway hoặc App)
-   */
-  @Public()
-  @Post(':contractId/units/:unitId/access-logs')
-  @HttpCode(HttpStatus.CREATED)
-  async recordAccessLog(
-    @Param('contractId', ParseIntPipe) contractId: number,
-    @Param('unitId', ParseIntPipe) unitId: number,
-    @Body() dto: RecordAccessLogDto,
-  ) {
-    return this.contractsService.recordAccessLog(contractId, unitId, dto);
-  }
-
-  /**
-   * Xem lịch sử ra vào ngăn kho
-   */
-  @Get(':contractId/units/:unitId/access-logs')
-  async getAccessLogs(
-    @Param('contractId', ParseIntPipe) contractId: number,
-    @Param('unitId', ParseIntPipe) unitId: number,
-    @CurrentUser() user: any,
-  ) {
-    return this.contractsService.getAccessLogs(
+    return this.contractsService.getSmartLockInfo(
       contractId,
       unitId,
       user.id,
@@ -158,7 +120,27 @@ export class ContractsController {
   }
 
   /**
-   * Khóa/mở khóa mã mở cửa ngăn kho (Staff / Manager)
+   * Khách hàng tự đổi mã PIN của ổ khóa thông minh
+   * POST /contracts/:contractId/units/:unitId/smart-lock/change-pin
+   */
+  @Post(':contractId/units/:unitId/smart-lock/change-pin')
+  async changeSmartLockPin(
+    @Param('contractId', ParseIntPipe) contractId: number,
+    @Param('unitId', ParseIntPipe) unitId: number,
+    @CurrentUser() user: any,
+    @Body() dto: ChangeSmartLockPinDto,
+  ) {
+    return this.contractsService.changeSmartLockPin(
+      contractId,
+      unitId,
+      user.id,
+      dto,
+    );
+  }
+
+  /**
+   * Đặt lại mã PIN ngẫu nhiên hoặc chỉ định (Master Reset PIN dành cho Staff/Manager/Admin)
+   * POST /contracts/:contractId/units/:unitId/smart-lock/reset-pin
    */
   @Roles(
     UserRole.FACILITY_STAFF,
@@ -166,13 +148,36 @@ export class ContractsController {
     UserRole.BUSINESS_OPERATIONS_MANAGER,
     UserRole.SYSTEM_ADMINISTRATOR,
   )
-  @Patch(':contractId/units/:unitId/access-status')
-  async updateAccessStatus(
+  @Post(':contractId/units/:unitId/smart-lock/reset-pin')
+  async resetSmartLockPin(
     @Param('contractId', ParseIntPipe) contractId: number,
     @Param('unitId', ParseIntPipe) unitId: number,
-    @Body() dto: UpdateAccessStatusDto,
+    @Body() dto: ResetSmartLockPinDto,
   ) {
-    return this.contractsService.updateAccessStatus(contractId, unitId, dto);
+    return this.contractsService.resetSmartLockPin(contractId, unitId, dto);
+  }
+
+  /**
+   * Khóa/mở khóa trạng thái mã PIN của ngăn kho (Staff / Manager / Admin)
+   * PATCH /contracts/:contractId/units/:unitId/smart-lock/status
+   */
+  @Roles(
+    UserRole.FACILITY_STAFF,
+    UserRole.FACILITY_MANAGER,
+    UserRole.BUSINESS_OPERATIONS_MANAGER,
+    UserRole.SYSTEM_ADMINISTRATOR,
+  )
+  @Patch(':contractId/units/:unitId/smart-lock/status')
+  async updateSmartLockStatus(
+    @Param('contractId', ParseIntPipe) contractId: number,
+    @Param('unitId', ParseIntPipe) unitId: number,
+    @Body() dto: UpdateSmartLockStatusDto,
+  ) {
+    return this.contractsService.updateSmartLockStatus(
+      contractId,
+      unitId,
+      dto,
+    );
   }
 
   // ==================== DANH MỤC LƯU TRỮ (STORED ITEMS) ====================
