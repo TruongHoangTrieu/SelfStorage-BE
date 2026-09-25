@@ -10,6 +10,14 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiParam,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { OperationsService } from './operations.service';
 import { CreatePolicyDto } from './dto/create-policy.dto';
 import { CreateFeeTypeDto } from './dto/create-fee-type.dto';
@@ -22,6 +30,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import { UserRole } from '../common/enums/role.enum';
 
+@ApiTags('Operations & Business Rules')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('operations')
 export class OperationsController {
@@ -29,6 +38,10 @@ export class OperationsController {
 
   // ==================== POLICIES ====================
 
+  @ApiOperation({ summary: 'Xem danh sách chính sách vận hành (Cancellation, Refund, Storage, Insurance,...)' })
+  @ApiQuery({ name: 'policyType', required: false, description: 'Loại chính sách (CANCELLATION, REFUND, ACCESS, FACILITY, PENALTY, GENERAL)' })
+  @ApiQuery({ name: 'facilityId', required: false, description: 'Lọc theo cơ sở áp dụng' })
+  @ApiResponse({ status: 200, description: 'Danh sách chính sách' })
   @Public()
   @Get('policies')
   async getPolicies(
@@ -41,12 +54,19 @@ export class OperationsController {
     );
   }
 
+  @ApiOperation({ summary: 'Xem chi tiết một chính sách' })
+  @ApiParam({ name: 'id', description: 'ID chính sách', example: 1 })
+  @ApiResponse({ status: 200, description: 'Chi tiết chính sách' })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy chính sách' })
   @Public()
   @Get('policies/:id')
   async getPolicyById(@Param('id', ParseIntPipe) id: number) {
     return this.operationsService.getPolicyById(id);
   }
 
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Thiết lập chính sách vận hành mới (Operations Manager / Admin)' })
+  @ApiResponse({ status: 201, description: 'Tạo chính sách thành công' })
   @Roles(UserRole.BUSINESS_OPERATIONS_MANAGER, UserRole.SYSTEM_ADMINISTRATOR)
   @Post('policies')
   @HttpCode(HttpStatus.CREATED)
@@ -56,12 +76,17 @@ export class OperationsController {
 
   // ==================== FEE TYPES & EXTRA CHARGES ====================
 
+  @ApiOperation({ summary: 'Xem danh mục các loại phụ phí (Vệ sinh, quá giờ, hư hại...)' })
+  @ApiResponse({ status: 200, description: 'Danh mục phụ phí' })
   @Public()
   @Get('fee-types')
   async getFeeTypes() {
     return this.operationsService.getFeeTypes();
   }
 
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Tạo loại phụ phí mới (Operations Manager / Admin)' })
+  @ApiResponse({ status: 201, description: 'Tạo loại phụ phí thành công' })
   @Roles(UserRole.BUSINESS_OPERATIONS_MANAGER, UserRole.SYSTEM_ADMINISTRATOR)
   @Post('fee-types')
   @HttpCode(HttpStatus.CREATED)
@@ -69,6 +94,9 @@ export class OperationsController {
     return this.operationsService.createFeeType(dto);
   }
 
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Ghi nhận phụ thu phí phát sinh cho hợp đồng hoặc đơn đặt chỗ (Staff / Manager / Admin)' })
+  @ApiResponse({ status: 201, description: 'Ghi nhận phụ thu thành công' })
   @Roles(
     UserRole.FACILITY_STAFF,
     UserRole.FACILITY_MANAGER,
@@ -84,6 +112,11 @@ export class OperationsController {
     return this.operationsService.createExtraCharge(user.id, dto);
   }
 
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Xem danh sách các khoản phụ thu phí' })
+  @ApiQuery({ name: 'contractId', required: false, description: 'Lọc theo ID hợp đồng' })
+  @ApiQuery({ name: 'reservationId', required: false, description: 'Lọc theo ID đơn đặt chỗ' })
+  @ApiResponse({ status: 200, description: 'Danh sách phụ thu' })
   @Get('extra-charges')
   async getExtraCharges(
     @Query('contractId') contractId?: string,
@@ -97,12 +130,18 @@ export class OperationsController {
 
   // ==================== DISCOUNTS ====================
 
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Xem danh sách mã voucher / khuyến mãi (Operations Manager / Admin)' })
+  @ApiResponse({ status: 200, description: 'Danh sách khuyến mãi' })
   @Roles(UserRole.BUSINESS_OPERATIONS_MANAGER, UserRole.SYSTEM_ADMINISTRATOR)
   @Get('discounts')
   async getDiscounts() {
     return this.operationsService.getDiscounts();
   }
 
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Tạo mã voucher / chương trình khuyến mãi mới (Operations Manager / Admin)' })
+  @ApiResponse({ status: 201, description: 'Tạo voucher thành công' })
   @Roles(UserRole.BUSINESS_OPERATIONS_MANAGER, UserRole.SYSTEM_ADMINISTRATOR)
   @Post('discounts')
   @HttpCode(HttpStatus.CREATED)
@@ -110,6 +149,11 @@ export class OperationsController {
     return this.operationsService.createDiscount(dto);
   }
 
+  @ApiOperation({ summary: 'Kiểm tra tính hợp lệ và giá trị giảm giá của mã voucher' })
+  @ApiParam({ name: 'code', description: 'Mã voucher (ví dụ: HELLO2026)', example: 'HELLO2026' })
+  @ApiResponse({ status: 200, description: 'Thông tin voucher và trạng thái hợp lệ' })
+  @ApiResponse({ status: 404, description: 'Mã voucher không tồn tại hoặc đã hết hạn' })
+  @Public()
   @Get('discounts/validate/:code')
   async validateDiscountCode(@Param('code') code: string) {
     return this.operationsService.validateDiscountCode(code);

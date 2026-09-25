@@ -11,6 +11,13 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiParam,
+} from '@nestjs/swagger';
 import { ReservationsService } from './reservations.service';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { UpdateReservationDto } from './dto/update-reservation.dto';
@@ -23,24 +30,24 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { UserRole } from '../common/enums/role.enum';
 
+@ApiTags('Reservations')
+@ApiBearerAuth('JWT-auth')
 @UseGuards(JwtAuthGuard)
 @Controller('reservations')
 export class ReservationsController {
   constructor(private readonly reservationsService: ReservationsService) {}
 
-  /**
-   * Check storage unit availability for reservation
-   * GET /reservations/availability?facilityId=1&unitTypeId=2&rentalPeriod=3
-   */
+  @ApiOperation({ summary: 'Kiểm tra phòng trống & dự toán giá thuê kho trước khi đặt chỗ' })
+  @ApiResponse({ status: 200, description: 'Thông tin phòng trống và tính giá' })
   @Get('availability')
   async checkAvailability(@Query() query: CheckAvailabilityDto) {
     return this.reservationsService.checkAvailability(query);
   }
 
-  /**
-   * Create a new reservation (Customer only)
-   * POST /reservations
-   */
+  @ApiOperation({ summary: 'Tạo đơn đặt chỗ thuê kho mới (Customer only)' })
+  @ApiResponse({ status: 201, description: 'Tạo đơn đặt chỗ thành công' })
+  @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ' })
+  @ApiResponse({ status: 409, description: 'Hết phòng trống thuộc loại kho này' })
   @UseGuards(RolesGuard)
   @Roles(UserRole.STORAGE_CUSTOMER)
   @Post()
@@ -52,10 +59,8 @@ export class ReservationsController {
     return this.reservationsService.create(user.id, createReservationDto);
   }
 
-  /**
-   * Get list of reservations (Customer sees own, Staff/Manager sees all with filter)
-   * GET /reservations?page=1&limit=10&status=PENDING
-   */
+  @ApiOperation({ summary: 'Lấy danh sách đơn đặt chỗ (Customer xem của mình, Staff/Manager xem tất cả)' })
+  @ApiResponse({ status: 200, description: 'Danh sách đơn đặt chỗ phân trang' })
   @Get()
   async findAll(
     @CurrentUser() user: any,
@@ -64,10 +69,11 @@ export class ReservationsController {
     return this.reservationsService.findAll(filterDto, user);
   }
 
-  /**
-   * Get reservation details by ID
-   * GET /reservations/:id
-   */
+  @ApiOperation({ summary: 'Lấy chi tiết đơn đặt chỗ theo ID' })
+  @ApiParam({ name: 'id', description: 'ID đơn đặt chỗ', example: 1 })
+  @ApiResponse({ status: 200, description: 'Chi tiết đơn đặt chỗ' })
+  @ApiResponse({ status: 403, description: 'Không có quyền xem đơn của khách hàng khác' })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy đơn' })
   @Get(':id')
   async findById(
     @Param('id', ParseIntPipe) id: number,
@@ -76,10 +82,9 @@ export class ReservationsController {
     return this.reservationsService.findById(id, user);
   }
 
-  /**
-   * Update reservation details (e.g. appointmentDate, rentalPeriod)
-   * PATCH /reservations/:id
-   */
+  @ApiOperation({ summary: 'Cập nhật thông tin đơn đặt chỗ (ngày hẹn, thời hạn thuê)' })
+  @ApiParam({ name: 'id', description: 'ID đơn đặt chỗ', example: 1 })
+  @ApiResponse({ status: 200, description: 'Cập nhật đơn thành công' })
   @Patch(':id')
   async update(
     @Param('id', ParseIntPipe) id: number,
@@ -89,10 +94,9 @@ export class ReservationsController {
     return this.reservationsService.update(id, updateReservationDto, user);
   }
 
-  /**
-   * Cancel a reservation and release the reserved storage unit
-   * POST /reservations/:id/cancel
-   */
+  @ApiOperation({ summary: 'Hủy đơn đặt chỗ và tự động giải phóng ngăn kho về trạng thái AVAILABLE' })
+  @ApiParam({ name: 'id', description: 'ID đơn đặt chỗ', example: 1 })
+  @ApiResponse({ status: 200, description: 'Hủy đơn đặt chỗ thành công' })
   @Post(':id/cancel')
   @HttpCode(HttpStatus.OK)
   async cancel(

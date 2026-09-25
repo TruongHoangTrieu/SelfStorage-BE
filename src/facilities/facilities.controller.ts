@@ -11,6 +11,14 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiQuery,
+  ApiParam,
+} from '@nestjs/swagger';
 import { FacilitiesService } from './facilities.service';
 import { CreateFacilityDto } from './dto/create-facility.dto';
 import { UpdateFacilityDto } from './dto/update-facility.dto';
@@ -21,6 +29,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import { UserRole } from '../common/enums/role.enum';
 
+@ApiTags('Facilities')
 @UseGuards(JwtAuthGuard)
 @Controller('facilities')
 export class FacilitiesController {
@@ -28,18 +37,27 @@ export class FacilitiesController {
 
   // ==================== CRUD CƠ SỞ KHO ====================
 
+  @ApiOperation({ summary: 'Lấy danh sách tất cả cơ sở kho (Kèm thống kê số lượng ngăn kho)' })
+  @ApiResponse({ status: 200, description: 'Danh sách cơ sở kho' })
   @Public()
   @Get()
   async findAll() {
     return this.facilitiesService.findAll();
   }
 
+  @ApiOperation({ summary: 'Lấy chi tiết một cơ sở kho theo ID' })
+  @ApiParam({ name: 'id', description: 'ID cơ sở kho', example: 1 })
+  @ApiResponse({ status: 200, description: 'Chi tiết cơ sở kho kèm loại kho và ngăn kho' })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy cơ sở' })
   @Public()
   @Get(':id')
   async findById(@Param('id', ParseIntPipe) id: number) {
     return this.facilitiesService.findById(id);
   }
 
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Tạo cơ sở kho mới (Manager / Admin)' })
+  @ApiResponse({ status: 201, description: 'Tạo cơ sở thành công' })
   @UseGuards(RolesGuard)
   @Roles(
     UserRole.FACILITY_MANAGER,
@@ -52,6 +70,10 @@ export class FacilitiesController {
     return this.facilitiesService.create(createFacilityDto);
   }
 
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Cập nhật thông tin cơ sở kho (Manager / Admin)' })
+  @ApiParam({ name: 'id', description: 'ID cơ sở kho', example: 1 })
+  @ApiResponse({ status: 200, description: 'Cập nhật cơ sở thành công' })
   @UseGuards(RolesGuard)
   @Roles(
     UserRole.FACILITY_MANAGER,
@@ -68,10 +90,10 @@ export class FacilitiesController {
 
   // ==================== FLOW 5: QUẢN LÝ NHÂN VIÊN ====================
 
-  /**
-   * Phân công nhân viên vào cơ sở kho
-   * POST /facilities/:id/staff
-   */
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Phân công nhân viên vào làm việc tại cơ sở kho (Manager / Admin)' })
+  @ApiParam({ name: 'id', description: 'ID cơ sở kho', example: 1 })
+  @ApiResponse({ status: 201, description: 'Phân công nhân viên thành công' })
   @UseGuards(RolesGuard)
   @Roles(
     UserRole.FACILITY_MANAGER,
@@ -87,10 +109,11 @@ export class FacilitiesController {
     return this.facilitiesService.assignStaff(facilityId, dto);
   }
 
-  /**
-   * Xem danh sách nhân viên đang làm việc tại cơ sở
-   * GET /facilities/:id/staff?includeEnded=true
-   */
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Xem danh sách nhân viên đang làm việc tại cơ sở (Staff / Manager / Admin)' })
+  @ApiParam({ name: 'id', description: 'ID cơ sở kho', example: 1 })
+  @ApiQuery({ name: 'includeEnded', required: false, description: 'Bao gồm nhân viên đã kết thúc phân công (true/false)' })
+  @ApiResponse({ status: 200, description: 'Danh sách nhân viên tại cơ sở' })
   @UseGuards(RolesGuard)
   @Roles(
     UserRole.FACILITY_STAFF,
@@ -109,10 +132,10 @@ export class FacilitiesController {
     );
   }
 
-  /**
-   * Kết thúc phân công nhân viên (rời khỏi cơ sở)
-   * PATCH /facilities/staff-assignments/:assignmentId/end
-   */
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Kết thúc phân công nhân viên tại cơ sở (Manager / Admin)' })
+  @ApiParam({ name: 'assignmentId', description: 'ID bản ghi phân công', example: 1 })
+  @ApiResponse({ status: 200, description: 'Kết thúc phân công thành công' })
   @UseGuards(RolesGuard)
   @Roles(
     UserRole.FACILITY_MANAGER,
@@ -129,10 +152,10 @@ export class FacilitiesController {
 
   // ==================== FLOW 5: SƠ ĐỒ NGĂN KHO (STORAGE LAYOUT) ====================
 
-  /**
-   * Xem sơ đồ ngăn kho theo cơ sở (nhóm theo tầng, trạng thái, loại kho)
-   * GET /facilities/:id/storage-layout
-   */
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Xem sơ đồ mặt bằng ngăn kho theo tầng và tỷ lệ lấp đầy (Staff / Manager / Admin)' })
+  @ApiParam({ name: 'id', description: 'ID cơ sở kho', example: 1 })
+  @ApiResponse({ status: 200, description: 'Sơ đồ mặt bằng kèm nhóm theo tầng và tỷ lệ lấp đầy' })
   @UseGuards(RolesGuard)
   @Roles(
     UserRole.FACILITY_STAFF,
@@ -147,10 +170,11 @@ export class FacilitiesController {
 
   // ==================== FLOW 5: YÊU CẦU HỖ TRỢ TẠI CƠ SỞ ====================
 
-  /**
-   * Danh sách yêu cầu hỗ trợ tại cơ sở (dành cho Staff/Manager)
-   * GET /facilities/:id/support-requests?status=OPEN&priority=HIGH
-   */
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Danh sách yêu cầu hỗ trợ tại cơ sở kho (Staff / Manager / Admin)' })
+  @ApiParam({ name: 'id', description: 'ID cơ sở kho', example: 1 })
+  @ApiQuery({ name: 'status', required: false, description: 'Lọc theo trạng thái ticket (OPEN, IN_PROGRESS, RESOLVED, CLOSED)' })
+  @ApiQuery({ name: 'priority', required: false, description: 'Lọc theo mức ưu tiên (LOW, MEDIUM, HIGH, URGENT)' })
   @UseGuards(RolesGuard)
   @Roles(
     UserRole.FACILITY_STAFF,
@@ -167,10 +191,9 @@ export class FacilitiesController {
     return this.facilitiesService.getSupportRequests(facilityId, status, priority);
   }
 
-  /**
-   * Phân công nhân viên xử lý yêu cầu hỗ trợ
-   * PATCH /facilities/support-requests/:requestId/assign
-   */
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Phân công nhân viên xử lý ticket hỗ trợ tại cơ sở (Manager / Admin)' })
+  @ApiParam({ name: 'requestId', description: 'ID ticket hỗ trợ', example: 1 })
   @UseGuards(RolesGuard)
   @Roles(
     UserRole.FACILITY_MANAGER,

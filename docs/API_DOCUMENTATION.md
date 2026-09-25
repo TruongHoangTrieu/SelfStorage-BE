@@ -6,6 +6,7 @@ Tài liệu này ghi lại danh sách tất cả các API đã phát triển tro
 
 ## 1. Thông Tin Cơ Bản (General Info)
 - **Base URL**: `http://localhost:5000`
+- **Swagger UI (Interactive API Docs)**: `http://localhost:5000/api/docs`
 - **Content-Type**: `application/json`
 - **Cơ chế xác thực**: `JWT Bearer Token`
 - **Header xác thực**: `Authorization: Bearer <access_token>`
