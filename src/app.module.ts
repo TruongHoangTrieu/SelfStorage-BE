@@ -13,6 +13,7 @@ import { HandoversModule } from './handovers/handovers.module';
 import { OperationsModule } from './operations/operations.module';
 import { ContractsModule } from './contracts/contracts.module';
 import { SupportModule } from './support/support.module';
+import { PaymentsModule } from './payments/payments.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { SupportModule } from './support/support.module';
     OperationsModule,
     ContractsModule,
     SupportModule,
+    PaymentsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

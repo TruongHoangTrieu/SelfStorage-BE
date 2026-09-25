@@ -780,9 +780,24 @@ Tài liệu này ghi lại danh sách tất cả các API đã phát triển tro
 - **`POST /operations/discounts`**: Tạo voucher giảm giá (`OPERATIONS_MANAGER`, `ADMIN`).
 - **`GET /operations/discounts/validate/:code`**: Kiểm tra tính hợp lệ và giá trị giảm giá của mã voucher.
 
-*(Lưu ý: Phần Tích hợp cổng thanh toán VNPAY/PayOS/Webhook và Thống kê báo cáo doanh thu tạm hoãn để họp thống nhất thêm với team Backend)*
+### 4.5. Tích Hợp Thanh Toán & Cổng SePay (Payments & SePay Integration - Flow 1 & Flow 2)
+- **`POST /payments/deposit`**: Tạo thanh toán tiền cọc cho đơn đặt chỗ (Flow 1: DEPOSIT). Trả về thông tin đơn thanh toán và VietQR URL.
+  ```json
+  {
+    "reservationId": 1,
+    "paymentMethod": "BANK_TRANSFER"
+  }
+  ```
+- **`GET /payments/reservations/:reservationId/summary`**: Tra cứu tổng hợp thanh toán của đơn đặt chỗ (Flow 2). Kiểm tra tiền cọc đã đóng và tính toán tiền thuê còn lại cần thanh toán.
+- **`POST /payments/rental`**: Tạo thanh toán tiền thuê cho giai đoạn Check-in (Flow 2: RENTAL), tránh thu trùng tiền cọc đã đóng.
+- **`POST /payments/sepay/webhook`**: Webhook tiếp nhận thông báo biến động số dư từ SePay (Public, bảo mật Apikey). Tự động xác thực số tiền, đối soát mã thanh toán, và cập nhật `Payment: PAID` + `Reservation: CONFIRMED` an toàn và chống trùng lặp (Idempotent).
+- **`GET /payments`**: Danh sách các giao dịch thanh toán (Khách xem của mình, Staff/Admin xem toàn bộ).
+- **`GET /payments/:id`**: Chi tiết một giao dịch thanh toán.
+
+*(Xem tài liệu chi tiết tại: [docs/payment-sepay.md](file:///d:/SelfStorage-BE/docs/payment-sepay.md))*
 
 ---
+
 
 ## 5. Flow 3: Quản Lý Kho Đang Thuê (Rented Storage Unit Management)
 

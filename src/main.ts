@@ -48,6 +48,7 @@ async function bootstrap() {
     .addTag('Contracts & Storage Management', 'Quản lý hợp đồng thuê, danh mục đồ đạc cất kho và mã PIN khóa thông minh')
     .addTag('Operations & Business Rules', 'Quản lý chính sách (Policy), biểu phí phát sinh (Fee Types/Charges), và mã giảm giá (Discounts)')
     .addTag('Support & Issue Handling', 'Quy trình tiếp nhận phản ánh, phân công kỹ thuật và xử lý sự cố')
+    .addTag('Payments & SePay Integration', 'Tạo thanh toán tiền cọc/tiền thuê, sinh mã VietQR và tiếp nhận SePay Webhook tự động')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
