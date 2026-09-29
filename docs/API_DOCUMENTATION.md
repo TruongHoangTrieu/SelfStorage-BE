@@ -26,11 +26,10 @@ Tài liệu này ghi lại danh sách tất cả các API đã phát triển tro
 
 | ID | Role | Email | Mật khẩu mặc định | Họ tên | Số điện thoại |
 | :---: | :--- | :--- | :--- | :--- | :--- |
-| `1` | `SYSTEM_ADMINISTRATOR` | `admin@selfstorage.com` | `Admin@123456` | System Administrator | `0900000001` |
-| `2` | `BUSINESS_OPERATIONS_MANAGER` | `business@selfstorage.com` | `Business@123456` | Business Operations Manager | `0900000002` |
-| `3` | `FACILITY_MANAGER` | `manager@selfstorage.com` | `Manager@123456` | Facility Manager Q1 | `0900000003` |
-| `4` | `FACILITY_STAFF` | `staff@selfstorage.com` | `Staff@123456` | Facility Staff Q1 | `0900000004` |
-| `5` | `STORAGE_CUSTOMER` | `customer@selfstorage.com` | `Customer@123456` | Nguyễn Văn Khách Hàng | `0900000005` |
+| `1` | `SYSTEM_ADMINISTRATOR` | `admin@selfstorage.vn` | `123456` | Quản Trị Hệ Thống | `02877700117` |
+| `2` | `FACILITY_MANAGER` | `manager@selfstorage.vn` | `123456` | Quản Lý Chi Nhánh Thủ Đức | `0901234567` |
+| `3` | `OPERATIONS_STAFF` | `staff@selfstorage.vn` | `123456` | Nhân Viên Vận Hành Kho | `0907654321` |
+| `4` | `STORAGE_CUSTOMER` | `customer@selfstorage.vn` | `123456` | Nguyễn Văn Khách Hàng | `0912345678` |
 
 ---
 
@@ -135,7 +134,7 @@ Tài liệu này ghi lại danh sách tất cả các API đã phát triển tro
 - **Method**: `GET`
 - **Endpoint**: `/facilities`
 - **Yêu cầu Auth**: **Không (Public - Guest & User đều xem được)**
-- **Dữ liệu trả về**: Danh sách cơ sở kèm `totalUnits`, `availableUnits`, `totalUnitTypes`.
+- **Dữ liệu trả về**: Danh sách cơ sở kèm `images`, `totalUnits`, `availableUnits`, `totalUnitTypes`.
 
 **Response Success (`200 OK`):**
 ```json

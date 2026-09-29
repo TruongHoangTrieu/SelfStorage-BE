@@ -1,4 +1,5 @@
 import {
+  IsArray,
   IsEmail,
   IsEnum,
   IsNotEmpty,
@@ -33,6 +34,11 @@ export class CreateFacilityDto {
   @IsString()
   @IsNotEmpty({ message: 'Facility address is required' })
   address: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  images?: string[];
 
   @IsOptional()
   @IsEnum(FacilityStatus, {

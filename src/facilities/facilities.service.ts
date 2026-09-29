@@ -99,7 +99,7 @@ export class FacilitiesService {
       throw new ConflictException(`Facility code '${code}' already exists`);
     }
 
-    return this.prisma.facility.create({
+    return (this.prisma.facility.create as any)({
       data: {
         name: dto.name.trim(),
         code,
@@ -107,6 +107,7 @@ export class FacilitiesService {
         phone: dto.phone?.trim() || null,
         email: dto.email?.trim().toLowerCase() || null,
         address: dto.address.trim(),
+        images: dto.images || [],
         status: dto.status || FacilityStatus.ACTIVE,
       },
     });
@@ -133,7 +134,7 @@ export class FacilitiesService {
       }
     }
 
-    return this.prisma.facility.update({
+    return (this.prisma.facility.update as any)({
       where: { id },
       data: {
         name: dto.name ? dto.name.trim() : undefined,
@@ -149,6 +150,7 @@ export class FacilitiesService {
             ? dto.email?.trim().toLowerCase() || null
             : undefined,
         address: dto.address ? dto.address.trim() : undefined,
+        images: dto.images !== undefined ? dto.images : undefined,
         status: dto.status || undefined,
       },
     });

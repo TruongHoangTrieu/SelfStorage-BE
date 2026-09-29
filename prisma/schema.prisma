@@ -287,6 +287,7 @@ model Facility {
   phone       String?        @map("phone")
   email       String?        @map("email")
   address     String         @map("address")
+  images      String[]       @default([]) @map("images")
   status      FacilityStatus @default(ACTIVE) @map("status")
   createdAt   DateTime       @default(now()) @map("created_at")
   updatedAt   DateTime       @updatedAt @map("updated_at")
