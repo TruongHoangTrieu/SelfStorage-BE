@@ -28,13 +28,23 @@ export class RolesGuard implements CanActivate {
       throw new ForbiddenException('Access denied: no user identified');
     }
 
-    const userRole = typeof user.role === 'string' ? user.role : user.role?.name;
+    const rawRole = typeof user.role === 'string' ? user.role : user.role?.name;
+    const normalizeRole = (r: string) => {
+      if (r === 'CUSTOMER') return UserRole.STORAGE_CUSTOMER;
+      if (r === 'OPERATIONS_STAFF') return UserRole.FACILITY_STAFF;
+      return r;
+    };
 
-    const hasRole = requiredRoles.some((role) => role === userRole);
+    const userRole = normalizeRole(rawRole);
+
+    const hasRole = requiredRoles.some((role) => {
+      const normalizedReq = normalizeRole(role as string);
+      return role === rawRole || normalizedReq === userRole || role === userRole;
+    });
 
     if (!hasRole) {
       throw new ForbiddenException(
-        `Forbidden: role '${userRole}' does not have sufficient permissions to access this resource`,
+        `Forbidden: role '${rawRole}' does not have sufficient permissions to access this resource`,
       );
     }
 

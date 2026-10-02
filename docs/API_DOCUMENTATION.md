@@ -160,6 +160,124 @@ Tài liệu này ghi lại danh sách tất cả các API đã phát triển tro
 - **Endpoint**: `/facilities/:id`
 - **Yêu cầu Auth**: **Không (Public - Guest & User đều xem được)**
 
+#### 3.6.1. Lấy danh sách gói thời hạn thuê & chiết khấu (Rental Durations)
+- **Method**: `GET`
+- **Endpoint**: `/facilities/:id/rental-durations`
+- **Yêu cầu Auth**: **Không (Public - Guest & User đều xem được)**
+- **Mô tả**: Lấy danh sách các gói thời hạn thuê (1 tháng, 2 tháng, 3 tháng, 6 tháng, 1 năm...) kèm tỷ lệ chiết khấu (%) và nhãn huy hiệu (badge). Hệ thống tự động ưu tiên bảng `Policy` (`policyType = "RENTAL_DURATION_DISCOUNT"`) theo cơ sở hoặc trả về cấu hình mặc định toàn hệ thống.
+
+**Response Success (`200 OK`):**
+```json
+[
+  { "key": "1_month", "months": 1, "label": "1 Tháng", "discount": 0, "badge": null },
+  { "key": "2_months", "months": 2, "label": "2 Tháng", "discount": 0, "badge": null },
+  { "key": "3_months", "months": 3, "label": "3 Tháng", "discount": 5, "badge": "Tiết kiệm 5%" },
+  { "key": "6_months", "months": 6, "label": "6 Tháng", "discount": 10, "badge": "Phổ biến - Giảm 10%" },
+  { "key": "1_year", "months": 12, "label": "1 Năm trở lên", "discount": 15, "badge": "Tốt nhất - Giảm 15%" }
+]
+```
+
+#### 3.6.2. Lấy các khung giờ hẹn dọn đồ vào khả dụng theo ngày (Available Move-in Time Slots)
+- **Method**: `GET`
+- **Endpoint**: `/facilities/:id/time-slots`
+- **Yêu cầu Auth**: **Không (Public - Guest & User đều xem được)**
+- **Query Params**:
+  - `date` *(optional)*: Ngày hẹn dọn đồ vào (định dạng `YYYY-MM-DD`, ví dụ: `2026-10-15`).
+- **Quy tắc & Kiểm tra khả dụng**:
+  - Khung giờ hoạt động: **08:00 - 16:00** (mỗi ca **1 tiếng**, nghỉ trưa từ **12:00 - 13:00** gồm 7 ca: `08:00-09:00`, `09:00-10:00`, `10:00-11:00`, `11:00-12:00`, `13:00-14:00`, `14:00-15:00`, `15:00-16:00`).
+  - Tự động đếm số lượng đơn đặt chỗ (`reservations`) thực tế trong ngày tại cơ sở.
+  - Quản lý sức chứa tối đa mỗi ca (mặc định: 3 khách/ca). Nếu đã đủ 3 lượt hẹn, trả về `available: false` kèm `reason: "Đã kín lịch hẹn"`.
+  - Nếu ngày chọn là ngày hôm nay, tự động kiểm tra giờ hiện tại so với giờ bắt đầu ca; nếu đã quá giờ, trả về `available: false` kèm `reason: "Đã qua khung giờ này"`.
+
+**Ví dụ gọi:** `/facilities/1/time-slots?date=2026-10-15`
+
+**Response Success (`200 OK`):**
+```json
+{
+  "date": "2026-10-15",
+  "maxCapacityPerSlot": 3,
+  "slots": [
+    {
+      "id": "slot_0800_0900",
+      "label": "08:00 - 09:00 (Sáng)",
+      "startTime": "08:00",
+      "endTime": "09:00",
+      "iso": "T08:00:00.000Z",
+      "available": true,
+      "bookedCount": 0,
+      "remainingCapacity": 3,
+      "reason": null
+    },
+    {
+      "id": "slot_0900_1000",
+      "label": "09:00 - 10:00 (Sáng)",
+      "startTime": "09:00",
+      "endTime": "10:00",
+      "iso": "T09:00:00.000Z",
+      "available": true,
+      "bookedCount": 1,
+      "remainingCapacity": 2,
+      "reason": null
+    },
+    {
+      "id": "slot_1000_1100",
+      "label": "10:00 - 11:00 (Sáng)",
+      "startTime": "10:00",
+      "endTime": "11:00",
+      "iso": "T10:00:00.000Z",
+      "available": true,
+      "bookedCount": 0,
+      "remainingCapacity": 3,
+      "reason": null
+    },
+    {
+      "id": "slot_1100_1200",
+      "label": "11:00 - 12:00 (Trưa)",
+      "startTime": "11:00",
+      "endTime": "12:00",
+      "iso": "T11:00:00.000Z",
+      "available": true,
+      "bookedCount": 0,
+      "remainingCapacity": 3,
+      "reason": null
+    },
+    {
+      "id": "slot_1300_1400",
+      "label": "13:00 - 14:00 (Chiều)",
+      "startTime": "13:00",
+      "endTime": "14:00",
+      "iso": "T13:00:00.000Z",
+      "available": true,
+      "bookedCount": 0,
+      "remainingCapacity": 3,
+      "reason": null
+    },
+    {
+      "id": "slot_1400_1500",
+      "label": "14:00 - 15:00 (Chiều)",
+      "startTime": "14:00",
+      "endTime": "15:00",
+      "iso": "T14:00:00.000Z",
+      "available": false,
+      "bookedCount": 3,
+      "remainingCapacity": 0,
+      "reason": "Đã kín lịch hẹn"
+    },
+    {
+      "id": "slot_1500_1600",
+      "label": "15:00 - 16:00 (Chiều)",
+      "startTime": "15:00",
+      "endTime": "16:00",
+      "iso": "T15:00:00.000Z",
+      "available": true,
+      "bookedCount": 0,
+      "remainingCapacity": 3,
+      "reason": null
+    }
+  ]
+}
+```
+
 #### 3.7. Tạo mới cơ sở kho
 - **Method**: `POST`
 - **Endpoint**: `/facilities`
@@ -394,6 +512,7 @@ Tài liệu này ghi lại danh sách tất cả các API đã phát triển tro
  - `appointmentDate` phải là ngày hợp lệ và không được nằm trong quá khứ.
  - `rentalPeriod` phải là số nguyên >= 1.
  - **Chống Double Booking / Race condition**: Sử dụng `prisma.$transaction` kết hợp kiểm tra khóa nguyên tử `status: AVAILABLE -> RESERVED`.
+ - **Tự động tính chiết khấu kỳ hạn**: Hệ thống tự động tra cứu chính sách `RENTAL_DURATION_DISCOUNT` (hoặc các mốc chuẩn: 3 tháng -5%, 6 tháng -10%, 12 tháng -15%) để trừ chiết khấu trực tiếp vào tiền thuê trong `totalAmount`.
  - Tự động sinh mã `reservationCode` duy nhất định dạng `RSV-YYYYMMDD-XXXXXX`.
  - Lấy `customerId` tự động từ `@CurrentUser()`, cấm truyền `customerId` qua body.
 

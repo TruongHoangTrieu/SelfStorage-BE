@@ -9,7 +9,13 @@ import { PrismaService } from '../database/prisma.service';
 import { CreateFacilityDto } from './dto/create-facility.dto';
 import { UpdateFacilityDto } from './dto/update-facility.dto';
 import { AssignStaffDto, EndStaffAssignmentDto } from './dto/assign-staff.dto';
-import { FacilityStatus, StorageUnitStatus, UserStatus } from '@prisma/client';
+import {
+  FacilityStatus,
+  StorageUnitStatus,
+  UserStatus,
+  ReservationStatus,
+  PolicyStatus,
+} from '@prisma/client';
 
 @Injectable()
 export class FacilitiesService {
@@ -462,6 +468,219 @@ export class FacilitiesService {
         },
       },
     });
+  }
+
+  // ==================== FLOW ĐẶT CHỖ (BOOKING OPTIONS) ====================
+
+  /**
+   * Lấy danh sách các gói thời hạn thuê và chiết khấu (Flow đặt chỗ)
+   * Ưu tiên cấu hình trong bảng Policy theo facilityId hoặc toàn hệ thống.
+   * Nếu chưa cấu hình trong DB, trả về danh sách gói chuẩn.
+   */
+  async getRentalDurations(facilityId: number) {
+    const facility = await this.prisma.facility.findUnique({
+      where: { id: facilityId },
+    });
+    if (!facility) {
+      throw new NotFoundException(`Facility with ID ${facilityId} not found`);
+    }
+
+    // Tìm policy chiết khấu theo thời hạn thuê
+    const policy = await this.prisma.policy.findFirst({
+      where: {
+        policyType: 'RENTAL_DURATION_DISCOUNT',
+        status: PolicyStatus.ACTIVE,
+        OR: [{ facilityId }, { facilityId: null }],
+      },
+      orderBy: { facilityId: 'desc' }, // specific facility overrides global
+    });
+
+    if (policy && Array.isArray(policy.value)) {
+      return policy.value;
+    }
+
+    // Default duration tiers nếu chưa cấu hình trong DB
+    return [
+      { key: '1_month', months: 1, label: '1 Tháng', discount: 0, badge: null },
+      { key: '2_months', months: 2, label: '2 Tháng', discount: 0, badge: null },
+      { key: '3_months', months: 3, label: '3 Tháng', discount: 5, badge: 'Tiết kiệm 5%' },
+      { key: '6_months', months: 6, label: '6 Tháng', discount: 10, badge: 'Phổ biến - Giảm 10%' },
+      { key: '1_year', months: 12, label: '1 Năm trở lên', discount: 15, badge: 'Tốt nhất - Giảm 15%' },
+    ];
+  }
+
+  /**
+   * Lấy danh sách khung giờ hẹn dọn đồ vào khả dụng theo ngày (Flow đặt chỗ)
+   * Tính toán dựa trên số lượng đơn đặt chỗ hiện có để tránh quá tải cùng khung giờ.
+   */
+  async getAvailableTimeSlots(facilityId: number, dateStr?: string) {
+    const facility = await this.prisma.facility.findUnique({
+      where: { id: facilityId },
+    });
+    if (!facility) {
+      throw new NotFoundException(`Facility with ID ${facilityId} not found`);
+    }
+
+    const defaultSlots = [
+      {
+        id: 'slot_0800_0900',
+        label: '08:00 - 09:00 (Sáng)',
+        startTime: '08:00',
+        endTime: '09:00',
+        iso: 'T08:00:00.000Z',
+        startHour: 8,
+        startMinute: 0,
+      },
+      {
+        id: 'slot_0900_1000',
+        label: '09:00 - 10:00 (Sáng)',
+        startTime: '09:00',
+        endTime: '10:00',
+        iso: 'T09:00:00.000Z',
+        startHour: 9,
+        startMinute: 0,
+      },
+      {
+        id: 'slot_1000_1100',
+        label: '10:00 - 11:00 (Sáng)',
+        startTime: '10:00',
+        endTime: '11:00',
+        iso: 'T10:00:00.000Z',
+        startHour: 10,
+        startMinute: 0,
+      },
+      {
+        id: 'slot_1100_1200',
+        label: '11:00 - 12:00 (Trưa)',
+        startTime: '11:00',
+        endTime: '12:00',
+        iso: 'T11:00:00.000Z',
+        startHour: 11,
+        startMinute: 0,
+      },
+      {
+        id: 'slot_1300_1400',
+        label: '13:00 - 14:00 (Chiều)',
+        startTime: '13:00',
+        endTime: '14:00',
+        iso: 'T13:00:00.000Z',
+        startHour: 13,
+        startMinute: 0,
+      },
+      {
+        id: 'slot_1400_1500',
+        label: '14:00 - 15:00 (Chiều)',
+        startTime: '14:00',
+        endTime: '15:00',
+        iso: 'T14:00:00.000Z',
+        startHour: 14,
+        startMinute: 0,
+      },
+      {
+        id: 'slot_1500_1600',
+        label: '15:00 - 16:00 (Chiều)',
+        startTime: '15:00',
+        endTime: '16:00',
+        iso: 'T15:00:00.000Z',
+        startHour: 15,
+        startMinute: 0,
+      },
+    ];
+
+    const maxCapacityPerSlot = 3; // Tối đa 3 khách dọn đồ cùng 1 khung giờ
+
+    if (!dateStr) {
+      return {
+        date: null,
+        maxCapacityPerSlot,
+        slots: defaultSlots.map((s) => ({
+          id: s.id,
+          label: s.label,
+          startTime: s.startTime,
+          endTime: s.endTime,
+          iso: s.iso,
+          available: true,
+          bookedCount: 0,
+          remainingCapacity: maxCapacityPerSlot,
+          reason: null,
+        })),
+      };
+    }
+
+    // Tìm các reservation trong ngày được chọn
+    const targetDate = new Date(dateStr);
+    const startOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), 0, 0, 0);
+    const endOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), 23, 59, 59, 999);
+
+    const existingReservations = await this.prisma.reservation.findMany({
+      where: {
+        facilityId,
+        status: {
+          notIn: [ReservationStatus.CANCELLED, ReservationStatus.EXPIRED],
+        },
+        appointmentDate: {
+          gte: startOfDay,
+          lte: endOfDay,
+        },
+      },
+      select: { appointmentDate: true },
+    });
+
+    const now = new Date();
+    const isToday =
+      targetDate.getFullYear() === now.getFullYear() &&
+      targetDate.getMonth() === now.getMonth() &&
+      targetDate.getDate() === now.getDate();
+
+    const slots = defaultSlots.map((slot) => {
+      // Đếm số reservation rơi vào khung giờ 1 tiếng này
+      const bookedCount = existingReservations.filter((res) => {
+        const resDate = new Date(res.appointmentDate);
+        const resHour = resDate.getUTCHours();
+        const resMinute = resDate.getUTCMinutes();
+        const resTotalMinutes = resHour * 60 + resMinute;
+        const slotStartMinutes = slot.startHour * 60 + slot.startMinute;
+        return (
+          resTotalMinutes >= slotStartMinutes &&
+          resTotalMinutes < slotStartMinutes + 60
+        );
+      }).length;
+
+      let available = bookedCount < maxCapacityPerSlot;
+      let reason: string | null = null;
+
+      // Nếu là ngày hôm nay, kiểm tra xem ca đó đã qua giờ hiện tại chưa
+      if (isToday) {
+        const slotStartTimeToday = new Date(targetDate);
+        slotStartTimeToday.setHours(slot.startHour, slot.startMinute, 0, 0);
+        if (now > slotStartTimeToday) {
+          available = false;
+          reason = 'Đã qua khung giờ này';
+        }
+      }
+
+      if (!available && !reason) {
+        reason = 'Đã kín lịch hẹn';
+      }
+
+      return {
+        id: slot.id,
+        label: slot.label,
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+        iso: slot.iso,
+        available,
+        bookedCount,
+        remainingCapacity: Math.max(0, maxCapacityPerSlot - bookedCount),
+        reason,
+      };
+    });
+
+    return {
+      date: dateStr,
+      maxCapacityPerSlot,
+      slots,
+    };
   }
 }
 

@@ -197,7 +197,38 @@ export class ReservationsService {
 
     const price = pricingRule ? pricingRule.price : new Prisma.Decimal(0);
     const depositAmount = unitType.depositAmount;
-    const totalAmount = price.mul(dto.rentalPeriod).add(depositAmount);
+
+    // Calculate rental duration discount
+    let discountPercent = 0;
+    if (dto.rentalPeriod >= 12) discountPercent = 15;
+    else if (dto.rentalPeriod >= 6) discountPercent = 10;
+    else if (dto.rentalPeriod >= 3) discountPercent = 5;
+
+    try {
+      const policy = await this.prisma.policy.findFirst({
+        where: {
+          policyType: 'RENTAL_DURATION_DISCOUNT',
+          status: 'ACTIVE',
+          OR: [{ facilityId: dto.facilityId }, { facilityId: null }],
+        },
+        orderBy: { facilityId: 'desc' },
+      });
+      if (policy && Array.isArray(policy.value)) {
+        const match = (policy.value as any[]).find(
+          (p) => p.months === dto.rentalPeriod,
+        );
+        if (match && typeof match.discount === 'number') {
+          discountPercent = match.discount;
+        }
+      }
+    } catch {
+      // Fallback to standard discount
+    }
+
+    const grossRental = price.mul(dto.rentalPeriod);
+    const discountFactor = new Prisma.Decimal(100 - discountPercent).div(100);
+    const netRental = grossRental.mul(discountFactor);
+    const totalAmount = netRental.add(depositAmount);
 
     // 6. Execute atomic transaction to hold unit and create reservation
     return this.prisma.$transaction(async (tx) => {

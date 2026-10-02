@@ -124,9 +124,12 @@ export class UsersService implements OnModuleInit {
   sanitizeUser(user: any) {
     if (!user) return null;
     const { passwordHash, role, roleId, ...sanitized } = user;
+    let roleName = typeof role === 'object' && role !== null ? role.name : role;
+    if (roleName === 'CUSTOMER') roleName = UserRole.STORAGE_CUSTOMER;
+    if (roleName === 'OPERATIONS_STAFF') roleName = UserRole.FACILITY_STAFF;
     return {
       ...sanitized,
-      role: typeof role === 'object' && role !== null ? role.name : role,
+      role: roleName,
     };
   }
 }

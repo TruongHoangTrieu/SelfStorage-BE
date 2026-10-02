@@ -55,6 +55,28 @@ export class FacilitiesController {
     return this.facilitiesService.findById(id);
   }
 
+  @ApiOperation({ summary: 'Lấy danh sách các gói thời hạn thuê và chiết khấu của cơ sở' })
+  @ApiParam({ name: 'id', description: 'ID cơ sở kho', example: 1 })
+  @ApiResponse({ status: 200, description: 'Danh sách các gói thời hạn thuê và chiết khấu' })
+  @Public()
+  @Get(':id/rental-durations')
+  async getRentalDurations(@Param('id', ParseIntPipe) id: number) {
+    return this.facilitiesService.getRentalDurations(id);
+  }
+
+  @ApiOperation({ summary: 'Lấy các khung giờ hẹn dọn đồ vào khả dụng theo ngày của cơ sở' })
+  @ApiParam({ name: 'id', description: 'ID cơ sở kho', example: 1 })
+  @ApiQuery({ name: 'date', required: false, description: 'Ngày hẹn (YYYY-MM-DD)', example: '2026-10-15' })
+  @ApiResponse({ status: 200, description: 'Danh sách các khung giờ và trạng thái khả dụng' })
+  @Public()
+  @Get(':id/time-slots')
+  async getTimeSlots(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('date') date?: string,
+  ) {
+    return this.facilitiesService.getAvailableTimeSlots(id, date);
+  }
+
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Tạo cơ sở kho mới (Manager / Admin)' })
   @ApiResponse({ status: 201, description: 'Tạo cơ sở thành công' })
