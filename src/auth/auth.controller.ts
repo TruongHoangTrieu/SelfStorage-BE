@@ -2,6 +2,7 @@ import {
   Controller,
   Post,
   Get,
+  Put,
   Body,
   UseGuards,
   HttpCode,
@@ -16,6 +17,8 @@ import {
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -53,6 +56,33 @@ export class AuthController {
   @Get('me')
   async getMe(@CurrentUser() user: any) {
     return user;
+  }
+
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Cập nhật thông tin cá nhân (họ tên, số điện thoại)' })
+  @ApiResponse({ status: 200, description: 'Cập nhật thành công, trả về thông tin user mới' })
+  @ApiResponse({ status: 401, description: 'Chưa xác thực hoặc token hết hạn' })
+  @UseGuards(JwtAuthGuard)
+  @Put('profile')
+  async updateProfile(
+    @CurrentUser() user: any,
+    @Body() updateProfileDto: UpdateProfileDto,
+  ) {
+    return this.authService.updateProfile(user.id, updateProfileDto);
+  }
+
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Đổi mật khẩu người dùng' })
+  @ApiResponse({ status: 200, description: 'Đổi mật khẩu thành công' })
+  @ApiResponse({ status: 400, description: 'Mật khẩu cũ không chính xác hoặc dữ liệu không hợp lệ' })
+  @ApiResponse({ status: 401, description: 'Chưa xác thực hoặc token hết hạn' })
+  @UseGuards(JwtAuthGuard)
+  @Put('change-password')
+  async changePassword(
+    @CurrentUser() user: any,
+    @Body() changePasswordDto: ChangePasswordDto,
+  ) {
+    return this.authService.changePassword(user.id, changePasswordDto);
   }
 
   @ApiBearerAuth('JWT-auth')

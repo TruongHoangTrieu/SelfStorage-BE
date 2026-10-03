@@ -3,7 +3,9 @@ import {
   OnModuleInit,
   Logger,
   NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
+import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../database/prisma.service';
 import { UserRole } from '../common/enums/role.enum';
 import { UserStatus } from '@prisma/client';
@@ -119,6 +121,54 @@ export class UsersService implements OnModuleInit {
       where: { id },
       data: { lastLoginAt: new Date() },
     });
+  }
+
+  async updateProfile(userId: number, data: { fullName?: string; phone?: string }) {
+    const existing = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!existing) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...(data.fullName !== undefined ? { fullName: data.fullName.trim() } : {}),
+        ...(data.phone !== undefined ? { phone: data.phone?.trim() || null } : {}),
+      },
+      include: {
+        role: true,
+      },
+    });
+
+    return this.sanitizeUser(updated);
+  }
+
+  async changePassword(userId: number, currentPass: string, newPass: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+
+    const isValid = await bcrypt.compare(currentPass, user.passwordHash);
+    if (!isValid) {
+      throw new BadRequestException('Mật khẩu hiện tại không chính xác');
+    }
+
+    if (currentPass === newPass) {
+      throw new BadRequestException('Mật khẩu mới không được trùng với mật khẩu hiện tại');
+    }
+
+    const saltRounds = 10;
+    const passwordHash = await bcrypt.hash(newPass, saltRounds);
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash },
+    });
+
+    return {
+      message: 'Đổi mật khẩu thành công',
+    };
   }
 
   sanitizeUser(user: any) {

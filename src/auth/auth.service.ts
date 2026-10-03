@@ -9,6 +9,8 @@ import * as bcrypt from 'bcrypt';
 import { UsersService } from '../users/users.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { UserRole } from '../common/enums/role.enum';
 import { UserStatus } from '@prisma/client';
 import { JwtPayload } from './strategies/jwt.strategy';
@@ -98,5 +100,17 @@ export class AuthService {
     return {
       message: 'Logged out successfully',
     };
+  }
+
+  async updateProfile(userId: number, dto: UpdateProfileDto) {
+    return this.usersService.updateProfile(userId, dto);
+  }
+
+  async changePassword(userId: number, dto: ChangePasswordDto) {
+    return this.usersService.changePassword(
+      userId,
+      dto.currentPassword,
+      dto.newPassword,
+    );
   }
 }
