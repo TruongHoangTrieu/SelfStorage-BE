@@ -527,7 +527,7 @@ export class FacilitiesService {
         label: '08:00 - 09:00 (Sáng)',
         startTime: '08:00',
         endTime: '09:00',
-        iso: 'T08:00:00.000Z',
+        iso: 'T08:00:00+07:00',
         startHour: 8,
         startMinute: 0,
       },
@@ -536,7 +536,7 @@ export class FacilitiesService {
         label: '09:00 - 10:00 (Sáng)',
         startTime: '09:00',
         endTime: '10:00',
-        iso: 'T09:00:00.000Z',
+        iso: 'T09:00:00+07:00',
         startHour: 9,
         startMinute: 0,
       },
@@ -545,7 +545,7 @@ export class FacilitiesService {
         label: '10:00 - 11:00 (Sáng)',
         startTime: '10:00',
         endTime: '11:00',
-        iso: 'T10:00:00.000Z',
+        iso: 'T10:00:00+07:00',
         startHour: 10,
         startMinute: 0,
       },
@@ -554,7 +554,7 @@ export class FacilitiesService {
         label: '11:00 - 12:00 (Trưa)',
         startTime: '11:00',
         endTime: '12:00',
-        iso: 'T11:00:00.000Z',
+        iso: 'T11:00:00+07:00',
         startHour: 11,
         startMinute: 0,
       },
@@ -563,7 +563,7 @@ export class FacilitiesService {
         label: '13:00 - 14:00 (Chiều)',
         startTime: '13:00',
         endTime: '14:00',
-        iso: 'T13:00:00.000Z',
+        iso: 'T13:00:00+07:00',
         startHour: 13,
         startMinute: 0,
       },
@@ -572,7 +572,7 @@ export class FacilitiesService {
         label: '14:00 - 15:00 (Chiều)',
         startTime: '14:00',
         endTime: '15:00',
-        iso: 'T14:00:00.000Z',
+        iso: 'T14:00:00+07:00',
         startHour: 14,
         startMinute: 0,
       },
@@ -581,7 +581,7 @@ export class FacilitiesService {
         label: '15:00 - 16:00 (Chiều)',
         startTime: '15:00',
         endTime: '16:00',
-        iso: 'T15:00:00.000Z',
+        iso: 'T15:00:00+07:00',
         startHour: 15,
         startMinute: 0,
       },
@@ -607,10 +607,9 @@ export class FacilitiesService {
       };
     }
 
-    // Tìm các reservation trong ngày được chọn
-    const targetDate = new Date(dateStr);
-    const startOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), 0, 0, 0);
-    const endOfDay = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate(), 23, 59, 59, 999);
+    // Tìm các reservation trong ngày được chọn theo múi giờ Việt Nam (UTC+7)
+    const startOfDay = new Date(`${dateStr}T00:00:00+07:00`);
+    const endOfDay = new Date(`${dateStr}T23:59:59.999+07:00`);
 
     const existingReservations = await this.prisma.reservation.findMany({
       where: {
@@ -627,17 +626,18 @@ export class FacilitiesService {
     });
 
     const now = new Date();
-    const isToday =
-      targetDate.getFullYear() === now.getFullYear() &&
-      targetDate.getMonth() === now.getMonth() &&
-      targetDate.getDate() === now.getDate();
+    const vnOffsetMs = 7 * 60 * 60 * 1000;
+    const vnNow = new Date(now.getTime() + vnOffsetMs);
+    const vnTodayStr = `${vnNow.getUTCFullYear()}-${(vnNow.getUTCMonth() + 1).toString().padStart(2, '0')}-${vnNow.getUTCDate().toString().padStart(2, '0')}`;
+    const isToday = dateStr === vnTodayStr;
 
     const slots = defaultSlots.map((slot) => {
-      // Đếm số reservation rơi vào khung giờ 1 tiếng này
+      // Đếm số reservation rơi vào khung giờ 1 tiếng này theo giờ Việt Nam
       const bookedCount = existingReservations.filter((res) => {
         const resDate = new Date(res.appointmentDate);
-        const resHour = resDate.getUTCHours();
-        const resMinute = resDate.getUTCMinutes();
+        const resVnDate = new Date(resDate.getTime() + vnOffsetMs);
+        const resHour = resVnDate.getUTCHours();
+        const resMinute = resVnDate.getUTCMinutes();
         const resTotalMinutes = resHour * 60 + resMinute;
         const slotStartMinutes = slot.startHour * 60 + slot.startMinute;
         return (
