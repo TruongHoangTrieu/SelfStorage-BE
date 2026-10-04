@@ -81,17 +81,20 @@ export class AuthService {
 
     await this.usersService.updateLastLogin(user.id);
 
+    const sanitizedUser = this.usersService.sanitizeUser(user);
+
     const payload: JwtPayload = {
       sub: user.id,
       email: user.email,
       role: user.role.name,
+      facilityId: sanitizedUser?.facilityId,
     };
 
     const accessToken = this.jwtService.sign(payload);
 
     return {
       accessToken,
-      user: this.usersService.sanitizeUser(user),
+      user: sanitizedUser,
     };
   }
 

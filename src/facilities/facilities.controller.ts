@@ -10,6 +10,7 @@ import {
   ParseIntPipe,
   HttpCode,
   HttpStatus,
+  ForbiddenException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -26,6 +27,7 @@ import { AssignStaffDto, EndStaffAssignmentDto } from './dto/assign-staff.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import { UserRole } from '../common/enums/role.enum';
 
@@ -146,8 +148,17 @@ export class FacilitiesController {
   @Get(':id/staff')
   async getStaffByFacility(
     @Param('id', ParseIntPipe) facilityId: number,
+    @CurrentUser() user: any,
     @Query('includeEnded') includeEnded?: string,
   ) {
+    if (
+      (user.role === UserRole.FACILITY_STAFF || user.role === UserRole.FACILITY_MANAGER) &&
+      user.facilityId &&
+      user.facilityId !== facilityId
+    ) {
+      throw new ForbiddenException('Bạn chỉ có quyền xem nhân viên thuộc cơ sở được phân công');
+    }
+
     return this.facilitiesService.getStaffByFacility(
       facilityId,
       includeEnded === 'true',
@@ -186,7 +197,18 @@ export class FacilitiesController {
     UserRole.SYSTEM_ADMINISTRATOR,
   )
   @Get(':id/storage-layout')
-  async getStorageLayout(@Param('id', ParseIntPipe) facilityId: number) {
+  async getStorageLayout(
+    @Param('id', ParseIntPipe) facilityId: number,
+    @CurrentUser() user: any,
+  ) {
+    if (
+      (user.role === UserRole.FACILITY_STAFF || user.role === UserRole.FACILITY_MANAGER) &&
+      user.facilityId &&
+      user.facilityId !== facilityId
+    ) {
+      throw new ForbiddenException('Bạn chỉ có quyền xem sơ đồ mặt bằng thuộc cơ sở được phân công');
+    }
+
     return this.facilitiesService.getStorageLayout(facilityId);
   }
 
@@ -207,9 +229,18 @@ export class FacilitiesController {
   @Get(':id/support-requests')
   async getSupportRequests(
     @Param('id', ParseIntPipe) facilityId: number,
+    @CurrentUser() user: any,
     @Query('status') status?: string,
     @Query('priority') priority?: string,
   ) {
+    if (
+      (user.role === UserRole.FACILITY_STAFF || user.role === UserRole.FACILITY_MANAGER) &&
+      user.facilityId &&
+      user.facilityId !== facilityId
+    ) {
+      throw new ForbiddenException('Bạn chỉ có quyền xem yêu cầu hỗ trợ thuộc cơ sở được phân công');
+    }
+
     return this.facilitiesService.getSupportRequests(facilityId, status, priority);
   }
 

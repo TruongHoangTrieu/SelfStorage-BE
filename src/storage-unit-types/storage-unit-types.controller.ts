@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Param,
   Query,
   Body,
@@ -85,5 +86,21 @@ export class StorageUnitTypesController {
     @Body() updateDto: UpdateStorageUnitTypeDto,
   ) {
     return this.storageUnitTypesService.update(id, updateDto);
+  }
+
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Xóa loại ngăn kho (Manager / Admin - Chỉ xóa khi chưa có ô kho/đơn đặt)' })
+  @ApiParam({ name: 'id', description: 'ID loại ngăn kho', example: 1 })
+  @ApiResponse({ status: 200, description: 'Xóa thành công' })
+  @ApiResponse({ status: 409, description: 'Không thể xóa vì đã có dữ liệu phụ thuộc' })
+  @UseGuards(RolesGuard)
+  @Roles(
+    UserRole.FACILITY_MANAGER,
+    UserRole.BUSINESS_OPERATIONS_MANAGER,
+    UserRole.SYSTEM_ADMINISTRATOR,
+  )
+  @Delete(':id')
+  async delete(@Param('id', ParseIntPipe) id: number) {
+    return this.storageUnitTypesService.delete(id);
   }
 }

@@ -65,10 +65,12 @@ export class ContractsController {
   )
   @Get()
   async getContracts(
+    @CurrentUser() user: any,
     @Query('facilityId') facilityId?: string,
     @Query('status') status?: ContractStatus,
   ) {
     return this.contractsService.getContracts(
+      user,
       facilityId ? parseInt(facilityId, 10) : undefined,
       status,
     );
@@ -83,7 +85,7 @@ export class ContractsController {
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user: any,
   ) {
-    return this.contractsService.getContractById(id, user.id, user.role);
+    return this.contractsService.getContractById(id, user.id, user.role, user.facilityId);
   }
 
   @ApiOperation({ summary: 'Khách hàng ký điện tử xác nhận hợp đồng' })

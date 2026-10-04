@@ -353,8 +353,21 @@ export class ReservationsService {
     // Customers can ONLY see their own reservations
     if (userRole === UserRole.STORAGE_CUSTOMER) {
       where.customerId = user.id;
+    } else if (
+      userRole === UserRole.FACILITY_STAFF ||
+      userRole === UserRole.FACILITY_MANAGER
+    ) {
+      // Staff / Manager cơ sở: Bắt buộc CHỈ xem đơn thuộc cơ sở được phân công
+      if (user.facilityId) {
+        where.facilityId = user.facilityId;
+      } else {
+        where.facilityId = -1; // Chưa được phân công cơ sở -> không hiển thị đơn
+      }
+      if (filter.customerId) {
+        where.customerId = filter.customerId;
+      }
     } else {
-      // Staff / Manager / Admin can filter by customerId or facilityId
+      // Admin / Ops Manager: Có thể xem toàn bộ hoặc lọc theo customer / facility
       if (filter.customerId) {
         where.customerId = filter.customerId;
       }
@@ -365,6 +378,8 @@ export class ReservationsService {
 
     if (filter.status) {
       where.status = filter.status;
+    } else if (filter.excludeStatus) {
+      where.status = { not: filter.excludeStatus };
     }
 
     if (filter.phone) {
@@ -507,6 +522,14 @@ export class ReservationsService {
       throw new ForbiddenException('You do not have permission to view this reservation');
     }
 
+    // Enforce facility scope for FACILITY_STAFF and FACILITY_MANAGER
+    if (
+      (userRole === UserRole.FACILITY_STAFF || userRole === UserRole.FACILITY_MANAGER) &&
+      reservation.facilityId !== user.facilityId
+    ) {
+      throw new ForbiddenException('Bạn chỉ có quyền xem đơn đặt chỗ thuộc cơ sở được phân công');
+    }
+
     return reservation;
   }
 
@@ -530,6 +553,14 @@ export class ReservationsService {
     // Ownership check
     if (userRole === UserRole.STORAGE_CUSTOMER && reservation.customerId !== user.id) {
       throw new ForbiddenException('You do not have permission to modify this reservation');
+    }
+
+    // Enforce facility scope for FACILITY_STAFF and FACILITY_MANAGER
+    if (
+      (userRole === UserRole.FACILITY_STAFF || userRole === UserRole.FACILITY_MANAGER) &&
+      reservation.facilityId !== user.facilityId
+    ) {
+      throw new ForbiddenException('Bạn chỉ có quyền chỉnh sửa đơn đặt chỗ thuộc cơ sở được phân công');
     }
 
     // Status check
@@ -635,6 +666,14 @@ export class ReservationsService {
     // Ownership check
     if (userRole === UserRole.STORAGE_CUSTOMER && reservation.customerId !== user.id) {
       throw new ForbiddenException('You do not have permission to cancel this reservation');
+    }
+
+    // Enforce facility scope for FACILITY_STAFF and FACILITY_MANAGER
+    if (
+      (userRole === UserRole.FACILITY_STAFF || userRole === UserRole.FACILITY_MANAGER) &&
+      reservation.facilityId !== user.facilityId
+    ) {
+      throw new ForbiddenException('Bạn chỉ có quyền hủy đơn đặt chỗ thuộc cơ sở được phân công');
     }
 
     // Status validation

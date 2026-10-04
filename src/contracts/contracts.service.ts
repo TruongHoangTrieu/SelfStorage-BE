@@ -32,6 +32,7 @@ export class ContractsService {
     contractId: number,
     userId: number,
     userRole: string,
+    userFacilityId?: number,
   ) {
     const contract = await this.prisma.rentalContract.findUnique({
       where: { id: contractId },
@@ -64,6 +65,14 @@ export class ContractsService {
       throw new ForbiddenException('Bạn không có quyền truy cập hợp đồng này');
     }
 
+    if (
+      (userRole === UserRole.FACILITY_STAFF || userRole === UserRole.FACILITY_MANAGER) &&
+      userFacilityId &&
+      !contract.contractItems.some((ci) => ci.unit.facilityId === userFacilityId)
+    ) {
+      throw new ForbiddenException('Bạn chỉ có quyền xem hợp đồng thuộc cơ sở được phân công');
+    }
+
     return contract;
   }
 
@@ -93,10 +102,19 @@ export class ContractsService {
   /**
    * Lấy danh sách hợp đồng (dành cho Quản lý & Nhân viên)
    */
-  async getContracts(facilityId?: number, status?: ContractStatus) {
+  async getContracts(user: any, facilityId?: number, status?: ContractStatus) {
     const where: any = {};
     if (status) where.status = status;
-    if (facilityId) {
+
+    const userRole = typeof user.role === 'string' ? user.role : user.role?.name;
+    if (userRole === UserRole.FACILITY_STAFF || userRole === UserRole.FACILITY_MANAGER) {
+      const enforcedFacilityId = user.facilityId || -1;
+      where.contractItems = {
+        some: {
+          unit: { facilityId: enforcedFacilityId },
+        },
+      };
+    } else if (facilityId) {
       where.contractItems = {
         some: {
           unit: { facilityId },
@@ -128,8 +146,18 @@ export class ContractsService {
   /**
    * Lấy chi tiết hợp đồng
    */
-  async getContractById(contractId: number, userId: number, userRole: string) {
-    return this.getContractAndValidateOwnership(contractId, userId, userRole);
+  async getContractById(
+    contractId: number,
+    userId: number,
+    userRole: string,
+    userFacilityId?: number,
+  ) {
+    return this.getContractAndValidateOwnership(
+      contractId,
+      userId,
+      userRole,
+      userFacilityId,
+    );
   }
 
   /**

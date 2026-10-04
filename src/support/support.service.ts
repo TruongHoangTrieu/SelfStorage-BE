@@ -124,11 +124,13 @@ export class SupportService {
     // Khách hàng chỉ xem được ticket của chính mình
     if (user.role === UserRole.STORAGE_CUSTOMER) {
       where.customerId = user.id;
-    } else if (customerId) {
-      where.customerId = customerId;
+    } else if (user.role === UserRole.FACILITY_STAFF || user.role === UserRole.FACILITY_MANAGER) {
+      where.facilityId = user.facilityId || -1;
+      if (customerId) where.customerId = customerId;
+    } else {
+      if (customerId) where.customerId = customerId;
+      if (facilityId) where.facilityId = facilityId;
     }
-
-    if (facilityId) where.facilityId = facilityId;
     if (status) where.status = status;
     if (category) where.category = category;
     if (priority) where.priority = priority;
@@ -249,6 +251,16 @@ export class SupportService {
     ) {
       throw new ForbiddenException(
         'Bạn không có quyền truy cập yêu cầu hỗ trợ này',
+      );
+    }
+
+    if (
+      (user.role === UserRole.FACILITY_STAFF || user.role === UserRole.FACILITY_MANAGER) &&
+      user.facilityId &&
+      request.facilityId !== user.facilityId
+    ) {
+      throw new ForbiddenException(
+        'Bạn chỉ có quyền truy cập yêu cầu hỗ trợ thuộc cơ sở được phân công',
       );
     }
 

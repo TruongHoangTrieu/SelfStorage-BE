@@ -16,22 +16,30 @@ Tài liệu này ghi lại danh sách tất cả các API đã phát triển tro
 
 ## 2. Danh Sách Roles & Tài Khoản Mẫu (IAM / RBAC / Test Accounts)
 
-### 2.1. Phân quyền (Roles)
+### 2.1. Phân quyền (5 Roles chuẩn của hệ thống)
 
-1. `STORAGE_CUSTOMER`: Khách hàng thuê kho / sử dụng dịch vụ.
-2. `FACILITY_STAFF`: Nhân viên vận hành tại cơ sở kho.
-3. `FACILITY_MANAGER`: Quản lý cơ sở kho.
-4. `BUSINESS_OPERATIONS_MANAGER`: Quản lý vận hành kinh doanh toàn hệ thống.
+1. `STORAGE_CUSTOMER`: Khách hàng cá nhân/doanh nghiệp thuê kho & sử dụng dịch vụ.
+2. `FACILITY_STAFF`: Nhân viên vận hành tại cơ sở kho (tiếp đón khách, bàn giao, kiểm tra kho).
+3. `FACILITY_MANAGER`: Quản lý cơ sở kho (phê duyệt, quản trị loại kho và ô kho tại cơ sở).
+4. `BUSINESS_OPERATIONS_MANAGER`: Quản lý vận hành kinh doanh toàn hệ thống (bảng giá, khuyến mãi, chính sách).
 5. `SYSTEM_ADMINISTRATOR`: Quản trị viên hệ thống kỹ thuật cao nhất.
 
 ### 2.2. Danh sách tài khoản mẫu để test (Seeded Test Accounts)
 
-| ID  | Role                   | Email                     | Mật khẩu mặc định | Họ tên                    | Số điện thoại |
-| :-: | :--------------------- | :------------------------ | :---------------- | :------------------------ | :------------ |
-| `1` | `SYSTEM_ADMINISTRATOR` | `admin@selfstorage.vn`    | `123456`          | Quản Trị Hệ Thống         | `02877700117` |
-| `2` | `FACILITY_MANAGER`     | `manager@selfstorage.vn`  | `123456`          | Quản Lý Chi Nhánh Thủ Đức | `0901234567`  |
-| `3` | `OPERATIONS_STAFF`     | `staff@selfstorage.vn`    | `123456`          | Nhân Viên Vận Hành Kho    | `0907654321`  |
-| `4` | `STORAGE_CUSTOMER`     | `customer@selfstorage.vn` | `123456`          | Nguyễn Văn Khách Hàng     | `0912345678`  |
+| ID  | Role (Mã vai trò)             | Tên vai trò (Role Name)     | Email                         | Mật khẩu mặc định | Cơ sở phân công                           | Họ tên                      | Số điện thoại |
+| :-: | :---------------------------- | :-------------------------- | :---------------------------- | :---------------- | :---------------------------------------- | :-------------------------- | :------------ |
+| `1` | `SYSTEM_ADMINISTRATOR`        | System Administrator        | `admin@selfstorage.vn`        | `123456`          | Toàn hệ thống                             | Quản Trị Hệ Thống           | `02877700117` |
+| `5` | `BUSINESS_OPERATIONS_MANAGER` | Business Operations Manager | `ops@selfstorage.vn`          | `123456`          | Toàn hệ thống                             | Quản Lý Vận Hành Kinh Doanh | `0908889999`  |
+| `2` | `FACILITY_MANAGER`            | Facility Manager            | `manager@selfstorage.vn`      | `123456`          | Facility 1 (Trụ sở Võ Nguyên Giáp)        | Quản Lý Chi Nhánh Thủ Đức   | `0901234567`  |
+| `3` | `FACILITY_STAFF`              | Facility Staff              | `staff@selfstorage.vn`        | `123456`          | Facility 1 (Trụ sở Võ Nguyên Giáp)        | Nguyễn Văn Staff            | `0907654321`  |
+| `7` | `FACILITY_STAFF`              | Facility Staff              | `staff.thuduc@selfstorage.vn` | `123456`          | Facility 1 (Trụ sở Võ Nguyên Giáp)        | Trần Văn Thủ Đức            | `0907654322`  |
+| `13`| `FACILITY_STAFF`              | Facility Staff              | `staff.anphu@selfstorage.vn`  | `123456`          | Facility 2 (Chi Nhánh An Phú - Thủ Đức)   | Ngô Tấn Tài                 | `0903999000`  |
+| `9` | `FACILITY_STAFF`              | Facility Staff              | `staff.quan1@selfstorage.vn`  | `123456`          | Facility 3 (Chi Nhánh Quận 1)             | Lê Hoàng Nam                | `0903111222`  |
+| `10`| `FACILITY_STAFF`              | Facility Staff              | `staff.quan7@selfstorage.vn`  | `123456`          | Facility 4 (Chi Nhánh Quận 7)             | Đặng Quốc Bảo               | `0903333444`  |
+| `11`| `FACILITY_STAFF`              | Facility Staff              | `staff.binhthanh@selfstorage.vn`| `123456`        | Facility 5 (Chi Nhánh Landmark 81)        | Vũ Minh Anh                 | `0903555666`  |
+| `12`| `FACILITY_STAFF`              | Facility Staff              | `staff.quan6@selfstorage.vn`  | `123456`          | Facility 6 (Chi Nhánh Centre Mall - Q.6)  | Huỳnh Gia Huy               | `0903777888`  |
+| `4` | `STORAGE_CUSTOMER`            | Storage Customer            | `customer@selfstorage.vn`     | `123456`          | Khách hàng cá nhân                        | Nguyễn Văn Khách Hàng       | `0912345678`  |
+
 
 ---
 
@@ -356,14 +364,18 @@ _(Hoặc đăng nhập với tài khoản Admin: `admin@selfstorage.com` / `Admi
 
 ---
 
-### NHÓM 3: STORAGE UNIT TYPES / LOẠI KHO
+### NHÓM 3: STORAGE UNIT TYPES & PRICING / LOẠI KHO & BẢNG GIÁ THEO CƠ SỞ
 
-#### 3.9. Lấy danh sách loại kho
+> **Cơ chế biểu phí phân tầng**:
+> - `price`: **Giá thuê niêm yết hàng tháng** (VNĐ/tháng), được lưu trữ và quản lý phiên bản qua bảng `PricingRule`. Áp dụng các chính sách chiết khấu kỳ hạn (ví dụ: thuê 3 tháng giảm 5%, 6 tháng giảm 10%, 1 năm giảm 15%).
+> - `depositAmount`: **Tiền cọc tiêu chuẩn** (VNĐ), lưu trong `StorageUnitType`. Đây là khoản tiền khách hàng thanh toán trực tuyến ngay qua VietQR/SePay để xác nhận giữ chỗ ô kho.
+
+#### 3.9. Lấy danh sách loại kho kèm bảng giá và số lượng khả dụng
 
 - **Method**: `GET`
 - **Endpoint**: `/storage-unit-types` hoặc `/storage-unit-types?facilityId=1`
 - **Yêu cầu Auth**: **Không (Public - Guest & User đều xem được)**
-- **Query Params**: `facilityId` (optional - lọc theo cơ sở)
+- **Query Params**: `facilityId` (optional - lọc theo cơ sở kho)
 
 **Response Success (`200 OK`):**
 
@@ -372,17 +384,18 @@ _(Hoặc đăng nhập với tài khoản Admin: `admin@selfstorage.com` / `Admi
   {
     "id": 1,
     "facilityId": 1,
-    "name": "Small Unit (2.5m2)",
-    "code": "TYPE_S",
-    "description": "Perfect for boxes and luggage",
-    "size": "2.50",
+    "name": "Kho Tiêu Chuẩn (5m2)",
+    "code": "M05",
+    "description": "Kho sạch sẽ, hút ẩm tự động, khóa thông minh Smart Lock",
+    "size": "5.00",
     "sizeUnit": "m2",
-    "depositAmount": "500000.00",
+    "price": 1600000,
+    "depositAmount": "1500000.00",
     "status": "ACTIVE",
     "facility": {
       "id": 1,
-      "name": "Self Storage Facility Alpha",
-      "code": "FAC_ALPHA"
+      "name": "Cơ sở Landmark 81",
+      "code": "FAC-LM81"
     },
     "totalUnits": 10,
     "availableUnits": 8
@@ -390,40 +403,83 @@ _(Hoặc đăng nhập với tài khoản Admin: `admin@selfstorage.com` / `Admi
 ]
 ```
 
-#### 3.10. Lấy chi tiết loại kho
+#### 3.10. Lấy chi tiết loại kho theo ID
 
 - **Method**: `GET`
 - **Endpoint**: `/storage-unit-types/:id`
 - **Yêu cầu Auth**: **Không (Public - Guest & User đều xem được)**
 
-#### 3.11. Tạo mới loại kho
+**Response Success (`200 OK`):** Trả về đối tượng loại kho kèm `price`, `depositAmount`, danh sách ô kho vật lý (`storageUnits`), và số lượng ô khả dụng (`availableUnits`).
+
+#### 3.11. Tạo mới loại kho & thiết lập bảng giá (Create Unit Type & Price)
 
 - **Method**: `POST`
 - **Endpoint**: `/storage-unit-types`
 - **Yêu cầu Auth**: **Bắt buộc** (`JwtAuthGuard`, `RolesGuard`)
 - **Roles cho phép**: `FACILITY_MANAGER`, `BUSINESS_OPERATIONS_MANAGER`, `SYSTEM_ADMINISTRATOR`
+- **Quy tắc**: Tự động tạo bản ghi `StorageUnitType` và thiết lập biểu phí `PricingRule` kích hoạt ngay lập tức (`effectiveFrom = now`).
 
 **Request Body:**
 
 ```json
 {
   "facilityId": 1,
-  "name": "Small Unit (2.5m2)",
-  "code": "TYPE_S",
-  "description": "Small unit",
-  "size": 2.5,
+  "name": "Kho Gia Đình Lớn (10m2)",
+  "code": "L10",
+  "description": "Phù hợp lưu trữ nội thất gia đình, hàng hóa kinh doanh",
+  "size": 10.0,
   "sizeUnit": "m2",
-  "depositAmount": 500000,
+  "price": 3200000,
+  "depositAmount": 3000000,
   "status": "ACTIVE"
 }
 ```
 
-#### 3.12. Cập nhật loại kho
+**Response Success (`201 Created`):** Trả về đối tượng vừa tạo kèm `price: 3200000`.
+
+#### 3.12. Cập nhật loại kho & cập nhật bảng giá (Update Unit Type & Price)
 
 - **Method**: `PATCH`
 - **Endpoint**: `/storage-unit-types/:id`
 - **Yêu cầu Auth**: **Bắt buộc** (`JwtAuthGuard`, `RolesGuard`)
 - **Roles cho phép**: `FACILITY_MANAGER`, `BUSINESS_OPERATIONS_MANAGER`, `SYSTEM_ADMINISTRATOR`
+- **Quy tắc**:
+  - Hỗ trợ cập nhật linh hoạt từng trường: `name`, `code`, `size`, `sizeUnit`, `description`, `price`, `depositAmount`, `status`.
+  - Khi cập nhật `price`, hệ thống tự động cập nhật hoặc tạo mới quy tắc giá `PricingRule` hiệu lực tương ứng.
+
+**Request Body Ví dụ:**
+
+```json
+{
+  "price": 3500000,
+  "depositAmount": 3000000,
+  "description": "Nâng cấp hệ thống camera AI và hút ẩm công nghiệp"
+}
+```
+
+**Response Success (`200 OK`):** Trả về thông tin loại kho sau khi cập nhật với giá thuê và tiền cọc mới.
+
+#### 3.13. Xóa loại kho (Delete Storage Unit Type)
+
+- **Method**: `DELETE`
+- **Endpoint**: `/storage-unit-types/:id`
+- **Yêu cầu Auth**: **Bắt buộc** (`JwtAuthGuard`, `RolesGuard`)
+- **Roles cho phép**: `FACILITY_MANAGER`, `BUSINESS_OPERATIONS_MANAGER`, `SYSTEM_ADMINISTRATOR`
+- **Quy tắc an toàn**:
+  - Kiểm tra xem loại ngăn kho đã có ô kho vật lý (`storageUnits`) hoặc đơn đặt chỗ (`reservationItems`) liên quan hay chưa.
+  - Nếu đã có dữ liệu phụ thuộc: Trả về lỗi `409 Conflict` kèm thông báo hướng dẫn chuyển trạng thái sang `INACTIVE` để ngừng cung cấp thay vì xóa cứng.
+  - Nếu chưa có dữ liệu phụ thuộc: Tiến hành xóa an toàn `pricingRules` và `storageUnitType`.
+
+**Response Success (`200 OK`):**
+
+```json
+{
+  "id": 5,
+  "facilityId": 1,
+  "name": "Kho Thử Nghiệm",
+  "code": "TEST01"
+}
+```
 
 ---
 

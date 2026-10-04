@@ -39,6 +39,12 @@ export class UpdateStorageUnitTypeDto {
   depositAmount?: number;
 
   @IsOptional()
+  @Type(() => Number)
+  @IsNumber({}, { message: 'price must be a valid number' })
+  @Min(0, { message: 'price must be greater than or equal to 0' })
+  price?: number;
+
+  @IsOptional()
   @IsEnum(UnitTypeStatus, { message: 'Status must be ACTIVE or INACTIVE' })
   status?: UnitTypeStatus;
 }

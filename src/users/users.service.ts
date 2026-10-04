@@ -68,6 +68,20 @@ export class UsersService implements OnModuleInit {
       where: { email: email.toLowerCase().trim() },
       include: {
         role: true,
+        staffFacilityAssignments: {
+          include: {
+            facility: {
+              select: {
+                id: true,
+                name: true,
+                code: true,
+                address: true,
+                phone: true,
+                email: true,
+              },
+            },
+          },
+        },
       },
     });
   }
@@ -77,6 +91,20 @@ export class UsersService implements OnModuleInit {
       where: { id },
       include: {
         role: true,
+        staffFacilityAssignments: {
+          include: {
+            facility: {
+              select: {
+                id: true,
+                name: true,
+                code: true,
+                address: true,
+                phone: true,
+                email: true,
+              },
+            },
+          },
+        },
       },
     });
   }
@@ -173,13 +201,31 @@ export class UsersService implements OnModuleInit {
 
   sanitizeUser(user: any) {
     if (!user) return null;
-    const { passwordHash, role, roleId, ...sanitized } = user;
+    const { passwordHash, role, roleId, staffFacilityAssignments, ...sanitized } = user;
     let roleName = typeof role === 'object' && role !== null ? role.name : role;
     if (roleName === 'CUSTOMER') roleName = UserRole.STORAGE_CUSTOMER;
     if (roleName === 'OPERATIONS_STAFF') roleName = UserRole.FACILITY_STAFF;
+
+    // Resolve active assigned facility for staff and manager
+    let facilityId: number | null = null;
+    let assignedFacility: any = null;
+
+    if (Array.isArray(staffFacilityAssignments) && staffFacilityAssignments.length > 0) {
+      const now = new Date();
+      const activeAssignment = staffFacilityAssignments.find(
+        (a: any) => !a.endedAt || new Date(a.endedAt) >= now,
+      );
+      if (activeAssignment) {
+        facilityId = activeAssignment.facilityId;
+        assignedFacility = activeAssignment.facility || null;
+      }
+    }
+
     return {
       ...sanitized,
       role: roleName,
+      facilityId,
+      assignedFacility,
     };
   }
 }
