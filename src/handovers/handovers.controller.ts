@@ -5,7 +5,6 @@ import {
   Param,
   Body,
   UseGuards,
-  ParseIntPipe,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
@@ -32,7 +31,7 @@ export class HandoversController {
   constructor(private readonly handoversService: HandoversService) {}
 
   @ApiOperation({ summary: 'Tra cứu thông tin đơn đặt chỗ để nhân viên chuẩn bị Check-in / Bàn giao kho' })
-  @ApiParam({ name: 'reservationId', description: 'ID đơn đặt chỗ', example: 1 })
+  @ApiParam({ name: 'reservationId', description: 'ID đơn đặt chỗ' })
   @ApiResponse({ status: 200, description: 'Thông tin đơn đặt chỗ kèm phòng và khách hàng' })
   @ApiResponse({ status: 403, description: 'Nhân viên không thuộc cơ sở của đơn này' })
   @Roles(
@@ -43,7 +42,7 @@ export class HandoversController {
   )
   @Get('reservations/:reservationId')
   async getReservationForCheckIn(
-    @Param('reservationId', ParseIntPipe) reservationId: number,
+    @Param('reservationId') reservationId: string,
     @CurrentUser() user: any,
   ) {
     return this.handoversService.getReservationForCheckIn(reservationId, user);

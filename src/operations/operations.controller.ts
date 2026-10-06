@@ -6,7 +6,6 @@ import {
   Param,
   Query,
   UseGuards,
-  ParseIntPipe,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
@@ -50,17 +49,17 @@ export class OperationsController {
   ) {
     return this.operationsService.getPolicies(
       policyType,
-      facilityId ? parseInt(facilityId, 10) : undefined,
+      facilityId,
     );
   }
 
   @ApiOperation({ summary: 'Xem chi tiết một chính sách' })
-  @ApiParam({ name: 'id', description: 'ID chính sách', example: 1 })
+  @ApiParam({ name: 'id', description: 'ID chính sách' })
   @ApiResponse({ status: 200, description: 'Chi tiết chính sách' })
   @ApiResponse({ status: 404, description: 'Không tìm thấy chính sách' })
   @Public()
   @Get('policies/:id')
-  async getPolicyById(@Param('id', ParseIntPipe) id: number) {
+  async getPolicyById(@Param('id') id: string) {
     return this.operationsService.getPolicyById(id);
   }
 
@@ -123,8 +122,8 @@ export class OperationsController {
     @Query('reservationId') reservationId?: string,
   ) {
     return this.operationsService.getExtraCharges(
-      contractId ? parseInt(contractId, 10) : undefined,
-      reservationId ? parseInt(reservationId, 10) : undefined,
+      contractId,
+      reservationId,
     );
   }
 

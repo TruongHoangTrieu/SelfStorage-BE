@@ -7,7 +7,6 @@ import {
   Body,
   Query,
   UseGuards,
-  ParseIntPipe,
   HttpCode,
   HttpStatus,
   ForbiddenException,
@@ -48,32 +47,32 @@ export class FacilitiesController {
   }
 
   @ApiOperation({ summary: 'Lấy chi tiết một cơ sở kho theo ID' })
-  @ApiParam({ name: 'id', description: 'ID cơ sở kho', example: 1 })
+  @ApiParam({ name: 'id', description: 'ID cơ sở kho' })
   @ApiResponse({ status: 200, description: 'Chi tiết cơ sở kho kèm loại kho và ngăn kho' })
   @ApiResponse({ status: 404, description: 'Không tìm thấy cơ sở' })
   @Public()
   @Get(':id')
-  async findById(@Param('id', ParseIntPipe) id: number) {
+  async findById(@Param('id') id: string) {
     return this.facilitiesService.findById(id);
   }
 
   @ApiOperation({ summary: 'Lấy danh sách các gói thời hạn thuê và chiết khấu của cơ sở' })
-  @ApiParam({ name: 'id', description: 'ID cơ sở kho', example: 1 })
+  @ApiParam({ name: 'id', description: 'ID cơ sở kho' })
   @ApiResponse({ status: 200, description: 'Danh sách các gói thời hạn thuê và chiết khấu' })
   @Public()
   @Get(':id/rental-durations')
-  async getRentalDurations(@Param('id', ParseIntPipe) id: number) {
+  async getRentalDurations(@Param('id') id: string) {
     return this.facilitiesService.getRentalDurations(id);
   }
 
   @ApiOperation({ summary: 'Lấy các khung giờ hẹn dọn đồ vào khả dụng theo ngày của cơ sở' })
-  @ApiParam({ name: 'id', description: 'ID cơ sở kho', example: 1 })
+  @ApiParam({ name: 'id', description: 'ID cơ sở kho' })
   @ApiQuery({ name: 'date', required: false, description: 'Ngày hẹn (YYYY-MM-DD)', example: '2026-10-15' })
   @ApiResponse({ status: 200, description: 'Danh sách các khung giờ và trạng thái khả dụng' })
   @Public()
   @Get(':id/time-slots')
   async getTimeSlots(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id') id: string,
     @Query('date') date?: string,
   ) {
     return this.facilitiesService.getAvailableTimeSlots(id, date);
@@ -96,7 +95,7 @@ export class FacilitiesController {
 
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Cập nhật thông tin cơ sở kho (Manager / Admin)' })
-  @ApiParam({ name: 'id', description: 'ID cơ sở kho', example: 1 })
+  @ApiParam({ name: 'id', description: 'ID cơ sở kho' })
   @ApiResponse({ status: 200, description: 'Cập nhật cơ sở thành công' })
   @UseGuards(RolesGuard)
   @Roles(
@@ -106,7 +105,7 @@ export class FacilitiesController {
   )
   @Patch(':id')
   async update(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id') id: string,
     @Body() updateFacilityDto: UpdateFacilityDto,
   ) {
     return this.facilitiesService.update(id, updateFacilityDto);
@@ -116,7 +115,7 @@ export class FacilitiesController {
 
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Phân công nhân viên vào làm việc tại cơ sở kho (Manager / Admin)' })
-  @ApiParam({ name: 'id', description: 'ID cơ sở kho', example: 1 })
+  @ApiParam({ name: 'id', description: 'ID cơ sở kho' })
   @ApiResponse({ status: 201, description: 'Phân công nhân viên thành công' })
   @UseGuards(RolesGuard)
   @Roles(
@@ -127,7 +126,7 @@ export class FacilitiesController {
   @Post(':id/staff')
   @HttpCode(HttpStatus.CREATED)
   async assignStaff(
-    @Param('id', ParseIntPipe) facilityId: number,
+    @Param('id') facilityId: string,
     @Body() dto: AssignStaffDto,
   ) {
     return this.facilitiesService.assignStaff(facilityId, dto);
@@ -135,7 +134,7 @@ export class FacilitiesController {
 
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Xem danh sách nhân viên đang làm việc tại cơ sở (Staff / Manager / Admin)' })
-  @ApiParam({ name: 'id', description: 'ID cơ sở kho', example: 1 })
+  @ApiParam({ name: 'id', description: 'ID cơ sở kho' })
   @ApiQuery({ name: 'includeEnded', required: false, description: 'Bao gồm nhân viên đã kết thúc phân công (true/false)' })
   @ApiResponse({ status: 200, description: 'Danh sách nhân viên tại cơ sở' })
   @UseGuards(RolesGuard)
@@ -147,7 +146,7 @@ export class FacilitiesController {
   )
   @Get(':id/staff')
   async getStaffByFacility(
-    @Param('id', ParseIntPipe) facilityId: number,
+    @Param('id') facilityId: string,
     @CurrentUser() user: any,
     @Query('includeEnded') includeEnded?: string,
   ) {
@@ -167,7 +166,7 @@ export class FacilitiesController {
 
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Kết thúc phân công nhân viên tại cơ sở (Manager / Admin)' })
-  @ApiParam({ name: 'assignmentId', description: 'ID bản ghi phân công', example: 1 })
+  @ApiParam({ name: 'assignmentId', description: 'ID bản ghi phân công' })
   @ApiResponse({ status: 200, description: 'Kết thúc phân công thành công' })
   @UseGuards(RolesGuard)
   @Roles(
@@ -177,7 +176,7 @@ export class FacilitiesController {
   )
   @Patch('staff-assignments/:assignmentId/end')
   async endStaffAssignment(
-    @Param('assignmentId', ParseIntPipe) assignmentId: number,
+    @Param('assignmentId') assignmentId: string,
     @Body() dto: EndStaffAssignmentDto,
   ) {
     return this.facilitiesService.endStaffAssignment(assignmentId, dto);
@@ -187,7 +186,7 @@ export class FacilitiesController {
 
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Xem sơ đồ mặt bằng ngăn kho theo tầng và tỷ lệ lấp đầy (Staff / Manager / Admin)' })
-  @ApiParam({ name: 'id', description: 'ID cơ sở kho', example: 1 })
+  @ApiParam({ name: 'id', description: 'ID cơ sở kho' })
   @ApiResponse({ status: 200, description: 'Sơ đồ mặt bằng kèm nhóm theo tầng và tỷ lệ lấp đầy' })
   @UseGuards(RolesGuard)
   @Roles(
@@ -198,7 +197,7 @@ export class FacilitiesController {
   )
   @Get(':id/storage-layout')
   async getStorageLayout(
-    @Param('id', ParseIntPipe) facilityId: number,
+    @Param('id') facilityId: string,
     @CurrentUser() user: any,
   ) {
     if (
@@ -216,7 +215,7 @@ export class FacilitiesController {
 
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Danh sách yêu cầu hỗ trợ tại cơ sở kho (Staff / Manager / Admin)' })
-  @ApiParam({ name: 'id', description: 'ID cơ sở kho', example: 1 })
+  @ApiParam({ name: 'id', description: 'ID cơ sở kho' })
   @ApiQuery({ name: 'status', required: false, description: 'Lọc theo trạng thái ticket (OPEN, IN_PROGRESS, RESOLVED, CLOSED)' })
   @ApiQuery({ name: 'priority', required: false, description: 'Lọc theo mức ưu tiên (LOW, MEDIUM, HIGH, URGENT)' })
   @UseGuards(RolesGuard)
@@ -228,7 +227,7 @@ export class FacilitiesController {
   )
   @Get(':id/support-requests')
   async getSupportRequests(
-    @Param('id', ParseIntPipe) facilityId: number,
+    @Param('id') facilityId: string,
     @CurrentUser() user: any,
     @Query('status') status?: string,
     @Query('priority') priority?: string,
@@ -246,7 +245,7 @@ export class FacilitiesController {
 
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Phân công nhân viên xử lý ticket hỗ trợ tại cơ sở (Manager / Admin)' })
-  @ApiParam({ name: 'requestId', description: 'ID ticket hỗ trợ', example: 1 })
+  @ApiParam({ name: 'requestId', description: 'ID ticket hỗ trợ' })
   @UseGuards(RolesGuard)
   @Roles(
     UserRole.FACILITY_MANAGER,
@@ -255,8 +254,8 @@ export class FacilitiesController {
   )
   @Patch('support-requests/:requestId/assign')
   async assignSupportRequest(
-    @Param('requestId', ParseIntPipe) requestId: number,
-    @Body('staffId', ParseIntPipe) staffId: number,
+    @Param('requestId') requestId: string,
+    @Body('staffId') staffId: string,
   ) {
     return this.facilitiesService.assignSupportRequest(requestId, staffId);
   }

@@ -1,9 +1,7 @@
-import { IsInt, IsOptional } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsOptional, IsString } from 'class-validator';
 
 export class FilterStorageUnitTypeDto {
   @IsOptional()
-  @Type(() => Number)
-  @IsInt({ message: 'facilityId must be an integer' })
-  facilityId?: number;
+  @IsString({ message: 'facilityId must be a string' })
+  facilityId?: string;
 }

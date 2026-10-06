@@ -1,24 +1,21 @@
 import {
   IsEnum,
-  IsInt,
   IsNotEmpty,
   IsOptional,
   IsString,
   MaxLength,
   IsArray,
 } from 'class-validator';
-import { Type } from 'class-transformer';
 import { SupportCategory, SupportPriority } from '@prisma/client';
 
 export class CreateSupportRequestDto {
-  @IsInt()
-  @Type(() => Number)
-  facilityId: number;
+  @IsString()
+  @IsNotEmpty()
+  facilityId: string;
 
   @IsOptional()
-  @IsInt()
-  @Type(() => Number)
-  contractItemId?: number;
+  @IsString()
+  contractItemId?: string;
 
   @IsEnum(SupportCategory, {
     message:

@@ -1,4 +1,4 @@
-import { IsOptional, IsInt, IsEnum, Min } from 'class-validator';
+import { IsOptional, IsInt, IsEnum, Min, IsString } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { PaymentStatus, PaymentType, PaymentMethod } from '@prisma/client';
@@ -35,13 +35,11 @@ export class FilterPaymentDto {
 
   @ApiPropertyOptional({ description: 'Lọc theo ID đơn đặt chỗ (Reservation ID)' })
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  reservationId?: number;
+  @IsString()
+  reservationId?: string;
 
   @ApiPropertyOptional({ description: 'Lọc theo ID hợp đồng (Contract ID)' })
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  contractId?: number;
+  @IsString()
+  contractId?: string;
 }

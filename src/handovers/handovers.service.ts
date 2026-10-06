@@ -57,9 +57,9 @@ export class HandoversService {
    * Helper to verify facility staff assignment scope
    */
   private async verifyStaffFacilityScope(
-    userId: number,
+    userId: string,
     userRole: string,
-    facilityId: number,
+    facilityId: string,
     facilityName?: string,
   ): Promise<void> {
     if (userRole === UserRole.FACILITY_STAFF) {
@@ -83,7 +83,7 @@ export class HandoversService {
   /**
    * Get reservation details prepared for check-in verification
    */
-  async getReservationForCheckIn(reservationId: number, user: any) {
+  async getReservationForCheckIn(reservationId: string, user: any) {
     const reservation = await this.prisma.reservation.findUnique({
       where: { id: reservationId },
       include: {
@@ -339,7 +339,7 @@ export class HandoversService {
             notes: dto.notes || null,
             photos: dto.photos
               ? (dto.photos as Prisma.InputJsonValue)
-              : Prisma.JsonNull,
+              : null,
             inspectionDate: new Date(),
           },
         });

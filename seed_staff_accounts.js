@@ -17,13 +17,16 @@ async function main() {
 
   const defaultPasswordHash = await bcrypt.hash('123456', 10);
 
+  const facilities = await prisma.facility.findMany();
+  const getFacilityId = (idx) => facilities[idx]?.id || facilities[0]?.id;
+
   // List of staff accounts to create/assign
   const staffConfigs = [
     {
       email: 'staff@selfstorage.vn',
       fullName: 'Nguyễn Văn Staff (Trụ sở Thủ Đức)',
       phone: '0907654321',
-      facilityId: 1, // Trụ sở chính Thủ Đức
+      facilityIndex: 0, // Trụ sở chính Thủ Đức
       roleId: staffRole.id,
       position: 'Nhân viên vận hành kho',
     },
@@ -31,7 +34,7 @@ async function main() {
       email: 'staff.thuduc@selfstorage.vn',
       fullName: 'Trần Văn Thủ Đức (NV Võ Nguyên Giáp)',
       phone: '0907654322',
-      facilityId: 1, // Trụ sở chính Thủ Đức
+      facilityIndex: 0, // Trụ sở chính Thủ Đức
       roleId: staffRole.id,
       position: 'Nhân viên vận hành kho',
     },
@@ -39,7 +42,7 @@ async function main() {
       email: 'manager@selfstorage.vn',
       fullName: 'Phạm Thị Quản Lý (Quản lý Thủ Đức)',
       phone: '0901234567',
-      facilityId: 1, // Trụ sở chính Thủ Đức
+      facilityIndex: 0, // Trụ sở chính Thủ Đức
       roleId: managerRole.id,
       position: 'Quản lý cơ sở kho',
     },
@@ -47,7 +50,7 @@ async function main() {
       email: 'staff.quan1@selfstorage.vn',
       fullName: 'Lê Hoàng Nam (NV Chi nhánh Quận 1)',
       phone: '0903111222',
-      facilityId: 3, // Quận 1
+      facilityIndex: 2, // Quận 1
       roleId: staffRole.id,
       position: 'Nhân viên vận hành kho',
     },
@@ -55,7 +58,7 @@ async function main() {
       email: 'staff.quan7@selfstorage.vn',
       fullName: 'Đặng Quốc Bảo (NV Chi nhánh Quận 7)',
       phone: '0903333444',
-      facilityId: 4, // Quận 7
+      facilityIndex: 3, // Quận 7
       roleId: staffRole.id,
       position: 'Nhân viên vận hành kho',
     },
@@ -63,7 +66,7 @@ async function main() {
       email: 'staff.binhthanh@selfstorage.vn',
       fullName: 'Vũ Minh Anh (NV Chi nhánh Bình Thạnh)',
       phone: '0903555666',
-      facilityId: 5, // Bình Thạnh
+      facilityIndex: 4, // Bình Thạnh
       roleId: staffRole.id,
       position: 'Nhân viên vận hành kho',
     },
@@ -71,7 +74,7 @@ async function main() {
       email: 'staff.quan6@selfstorage.vn',
       fullName: 'Huỳnh Gia Huy (NV Chi nhánh Quận 6)',
       phone: '0903777888',
-      facilityId: 6, // Quận 6
+      facilityIndex: 5, // Quận 6
       roleId: staffRole.id,
       position: 'Nhân viên vận hành kho',
     },
@@ -79,13 +82,15 @@ async function main() {
       email: 'staff.anphu@selfstorage.vn',
       fullName: 'Ngô Tấn Tài (NV Chi nhánh An Phú)',
       phone: '0903999000',
-      facilityId: 2, // An Phú
+      facilityIndex: 1, // An Phú
       roleId: staffRole.id,
       position: 'Nhân viên vận hành kho',
     },
   ];
 
   for (const item of staffConfigs) {
+    const assignedFacilityId = getFacilityId(item.facilityIndex);
+
     // 1. Upsert User
     const user = await prisma.user.upsert({
       where: { email: item.email },
@@ -106,11 +111,16 @@ async function main() {
       },
     });
 
+    if (!assignedFacilityId) {
+      console.log(`[SKIP ASSIGN] No facility available for ${user.email}`);
+      continue;
+    }
+
     // 2. Ensure StaffFacilityAssignment
     const existingAssignment = await prisma.staffFacilityAssignment.findFirst({
       where: {
         userId: user.id,
-        facilityId: item.facilityId,
+        facilityId: assignedFacilityId,
         endedAt: null,
       },
     });
@@ -125,15 +135,15 @@ async function main() {
       await prisma.staffFacilityAssignment.create({
         data: {
           userId: user.id,
-          facilityId: item.facilityId,
+          facilityId: assignedFacilityId,
           position: item.position,
           assignedAt: new Date(),
           endedAt: null,
         },
       });
-      console.log(`[ASSIGNED] User ${user.email} (ID: ${user.id}) -> Facility ${item.facilityId}`);
+      console.log(`[ASSIGNED] User ${user.email} (ID: ${user.id}) -> Facility ${assignedFacilityId}`);
     } else {
-      console.log(`[EXISTING] User ${user.email} (ID: ${user.id}) already assigned to Facility ${item.facilityId}`);
+      console.log(`[EXISTING] User ${user.email} (ID: ${user.id}) already assigned to Facility ${assignedFacilityId}`);
     }
   }
 

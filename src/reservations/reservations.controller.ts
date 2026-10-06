@@ -7,7 +7,6 @@ import {
   Body,
   Query,
   UseGuards,
-  ParseIntPipe,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
@@ -70,24 +69,24 @@ export class ReservationsController {
   }
 
   @ApiOperation({ summary: 'Lấy chi tiết đơn đặt chỗ theo ID' })
-  @ApiParam({ name: 'id', description: 'ID đơn đặt chỗ', example: 1 })
+  @ApiParam({ name: 'id', description: 'ID đơn đặt chỗ' })
   @ApiResponse({ status: 200, description: 'Chi tiết đơn đặt chỗ' })
   @ApiResponse({ status: 403, description: 'Không có quyền xem đơn của khách hàng khác' })
   @ApiResponse({ status: 404, description: 'Không tìm thấy đơn' })
   @Get(':id')
   async findById(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id') id: string,
     @CurrentUser() user: any,
   ) {
     return this.reservationsService.findById(id, user);
   }
 
   @ApiOperation({ summary: 'Cập nhật thông tin đơn đặt chỗ (ngày hẹn, thời hạn thuê)' })
-  @ApiParam({ name: 'id', description: 'ID đơn đặt chỗ', example: 1 })
+  @ApiParam({ name: 'id', description: 'ID đơn đặt chỗ' })
   @ApiResponse({ status: 200, description: 'Cập nhật đơn thành công' })
   @Patch(':id')
   async update(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id') id: string,
     @CurrentUser() user: any,
     @Body() updateReservationDto: UpdateReservationDto,
   ) {
@@ -95,12 +94,12 @@ export class ReservationsController {
   }
 
   @ApiOperation({ summary: 'Hủy đơn đặt chỗ và tự động giải phóng ngăn kho về trạng thái AVAILABLE' })
-  @ApiParam({ name: 'id', description: 'ID đơn đặt chỗ', example: 1 })
+  @ApiParam({ name: 'id', description: 'ID đơn đặt chỗ' })
   @ApiResponse({ status: 200, description: 'Hủy đơn đặt chỗ thành công' })
   @Post(':id/cancel')
   @HttpCode(HttpStatus.OK)
   async cancel(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id') id: string,
     @CurrentUser() user: any,
     @Body() cancelReservationDto: CancelReservationDto,
   ) {

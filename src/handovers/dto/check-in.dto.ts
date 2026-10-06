@@ -1,17 +1,14 @@
 import {
-  IsInt,
   IsNotEmpty,
   IsOptional,
   IsString,
   IsArray,
 } from 'class-validator';
-import { Type } from 'class-transformer';
 
 export class CheckInDto {
-  @Type(() => Number)
-  @IsInt({ message: 'reservationId must be an integer' })
+  @IsString({ message: 'reservationId must be a string' })
   @IsNotEmpty({ message: 'reservationId is required' })
-  reservationId: number;
+  reservationId: string;
 
   @IsString({ message: 'condition must be a string' })
   @IsNotEmpty({ message: 'condition is required (e.g. Unit is clean and undamaged)' })

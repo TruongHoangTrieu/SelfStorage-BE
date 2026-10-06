@@ -7,7 +7,6 @@ import {
   Query,
   Body,
   UseGuards,
-  ParseIntPipe,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
@@ -43,12 +42,12 @@ export class StorageUnitsController {
   }
 
   @ApiOperation({ summary: 'Lấy thông tin chi tiết một ngăn kho theo ID' })
-  @ApiParam({ name: 'id', description: 'ID ngăn kho', example: 1 })
+  @ApiParam({ name: 'id', description: 'ID ngăn kho' })
   @ApiResponse({ status: 200, description: 'Chi tiết ngăn kho' })
   @ApiResponse({ status: 404, description: 'Không tìm thấy ngăn kho' })
   @Public()
   @Get(':id')
-  async findById(@Param('id', ParseIntPipe) id: number) {
+  async findById(@Param('id') id: string) {
     return this.storageUnitsService.findById(id);
   }
 
@@ -71,7 +70,7 @@ export class StorageUnitsController {
 
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Cập nhật thông tin ngăn kho (Manager / Admin)' })
-  @ApiParam({ name: 'id', description: 'ID ngăn kho', example: 1 })
+  @ApiParam({ name: 'id', description: 'ID ngăn kho' })
   @ApiResponse({ status: 200, description: 'Cập nhật thành công' })
   @UseGuards(RolesGuard)
   @Roles(
@@ -81,7 +80,7 @@ export class StorageUnitsController {
   )
   @Patch(':id')
   async update(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id') id: string,
     @Body() updateDto: UpdateStorageUnitDto,
   ) {
     return this.storageUnitsService.update(id, updateDto);

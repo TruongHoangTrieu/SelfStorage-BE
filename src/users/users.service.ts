@@ -86,7 +86,7 @@ export class UsersService implements OnModuleInit {
     });
   }
 
-  async findById(id: number) {
+  async findById(id: string) {
     return this.prisma.user.findUnique({
       where: { id },
       include: {
@@ -126,7 +126,7 @@ export class UsersService implements OnModuleInit {
     email: string;
     phone?: string;
     passwordHash: string;
-    roleId: number;
+    roleId: string;
     status?: UserStatus;
   }) {
     return this.prisma.user.create({
@@ -144,14 +144,14 @@ export class UsersService implements OnModuleInit {
     });
   }
 
-  async updateLastLogin(id: number) {
+  async updateLastLogin(id: string) {
     return this.prisma.user.update({
       where: { id },
       data: { lastLoginAt: new Date() },
     });
   }
 
-  async updateProfile(userId: number, data: { fullName?: string; phone?: string }) {
+  async updateProfile(userId: string, data: { fullName?: string; phone?: string }) {
     const existing = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!existing) {
       throw new NotFoundException(`User with ID ${userId} not found`);
@@ -171,7 +171,7 @@ export class UsersService implements OnModuleInit {
     return this.sanitizeUser(updated);
   }
 
-  async changePassword(userId: number, currentPass: string, newPass: string) {
+  async changePassword(userId: string, currentPass: string, newPass: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
       throw new NotFoundException(`User with ID ${userId} not found`);
@@ -207,7 +207,7 @@ export class UsersService implements OnModuleInit {
     if (roleName === 'OPERATIONS_STAFF') roleName = UserRole.FACILITY_STAFF;
 
     // Resolve active assigned facility for staff and manager
-    let facilityId: number | null = null;
+    let facilityId: string | null = null;
     let assignedFacility: any = null;
 
     if (Array.isArray(staffFacilityAssignments) && staffFacilityAssignments.length > 0) {

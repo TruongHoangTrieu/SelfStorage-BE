@@ -96,12 +96,12 @@ export class ReservationsService {
       });
     }
 
-    const unitPrice = activePricingRule ? activePricingRule.price : new Prisma.Decimal(0);
-    const depositAmount = unitType.depositAmount;
+    const unitPrice = activePricingRule ? Number(activePricingRule.price) : 0;
+    const depositAmount = Number(unitType.depositAmount);
 
-    let estimatedTotal: Prisma.Decimal | null = null;
+    let estimatedTotal: number | null = null;
     if (dto.rentalPeriod && dto.rentalPeriod > 0) {
-      estimatedTotal = unitPrice.mul(dto.rentalPeriod).add(depositAmount);
+      estimatedTotal = unitPrice * dto.rentalPeriod + depositAmount;
     }
 
     return {
@@ -135,7 +135,7 @@ export class ReservationsService {
    * Create a new reservation for the authenticated customer.
    * Uses Prisma transaction and atomic status updates to prevent race conditions / double bookings.
    */
-  async create(customerId: number, dto: CreateReservationDto) {
+  async create(customerId: string, dto: CreateReservationDto) {
     // 1. Verify Facility exists and is active
     const facility = await this.prisma.facility.findUnique({
       where: { id: dto.facilityId },
@@ -195,8 +195,8 @@ export class ReservationsService {
       });
     }
 
-    const price = pricingRule ? pricingRule.price : new Prisma.Decimal(0);
-    const depositAmount = unitType.depositAmount;
+    const price = pricingRule ? Number(pricingRule.price) : 0;
+    const depositAmount = Number(unitType.depositAmount);
 
     // Calculate rental duration discount
     let discountPercent = 0;
@@ -225,10 +225,9 @@ export class ReservationsService {
       // Fallback to standard discount
     }
 
-    const grossRental = price.mul(dto.rentalPeriod);
-    const discountFactor = new Prisma.Decimal(100 - discountPercent).div(100);
-    const netRental = grossRental.mul(discountFactor);
-    const totalAmount = netRental.add(depositAmount);
+    const grossRental = price * dto.rentalPeriod;
+    const netRental = grossRental * ((100 - discountPercent) / 100);
+    const totalAmount = netRental + depositAmount;
 
     // 6. Execute atomic transaction to hold unit and create reservation
     return this.prisma.$transaction(async (tx) => {
@@ -239,7 +238,7 @@ export class ReservationsService {
           unitTypeId: dto.unitTypeId,
           status: StorageUnitStatus.AVAILABLE,
         },
-        orderBy: { id: 'asc' },
+        orderBy: { unitNumber: 'asc' },
       });
 
       if (!availableUnit) {
@@ -361,7 +360,7 @@ export class ReservationsService {
       if (user.facilityId) {
         where.facilityId = user.facilityId;
       } else {
-        where.facilityId = -1; // Chưa được phân công cơ sở -> không hiển thị đơn
+        where.facilityId = '000000000000000000000000'; // Unassigned
       }
       if (filter.customerId) {
         where.customerId = filter.customerId;
@@ -463,7 +462,7 @@ export class ReservationsService {
   /**
    * Get a single reservation by ID with ownership enforcement
    */
-  async findById(id: number, user: any) {
+  async findById(id: string, user: any) {
     const reservation = await this.prisma.reservation.findUnique({
       where: { id },
       include: {
@@ -536,7 +535,7 @@ export class ReservationsService {
   /**
    * Update a reservation with ownership and status validation
    */
-  async update(id: number, dto: UpdateReservationDto, user: any) {
+  async update(id: string, dto: UpdateReservationDto, user: any) {
     const reservation = await this.prisma.reservation.findUnique({
       where: { id },
       include: {
@@ -591,7 +590,7 @@ export class ReservationsService {
     if (dto.rentalPeriod && dto.rentalPeriod !== reservation.rentalPeriod) {
       const firstItem = reservation.items[0];
       if (firstItem) {
-        totalAmount = firstItem.price.mul(dto.rentalPeriod).add(firstItem.depositAmount);
+        totalAmount = Number(firstItem.price) * dto.rentalPeriod + Number(firstItem.depositAmount);
       }
     }
 
@@ -649,7 +648,7 @@ export class ReservationsService {
   /**
    * Cancel a reservation and release the held storage unit back to AVAILABLE.
    */
-  async cancel(id: number, user: any, dto?: CancelReservationDto) {
+  async cancel(id: string, user: any, dto?: CancelReservationDto) {
     const reservation = await this.prisma.reservation.findUnique({
       where: { id },
       include: {

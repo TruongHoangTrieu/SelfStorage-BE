@@ -1,12 +1,10 @@
 import {
   IsEnum,
-  IsInt,
   IsNotEmpty,
   IsOptional,
   IsString,
   IsArray,
 } from 'class-validator';
-import { Type } from 'class-transformer';
 import { SupportStatus } from '@prisma/client';
 
 export class UpdateTicketProgressDto {
@@ -26,9 +24,9 @@ export class UpdateTicketProgressDto {
 }
 
 export class AssignStaffTicketDto {
-  @IsInt()
-  @Type(() => Number)
-  staffId: number;
+  @IsString()
+  @IsNotEmpty()
+  staffId: string;
 }
 
 export class AddTicketNoteDto {

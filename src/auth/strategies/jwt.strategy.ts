@@ -6,10 +6,10 @@ import { UsersService } from '../../users/users.service';
 import { UserStatus } from '@prisma/client';
 
 export interface JwtPayload {
-  sub: number;
+  sub: string;
   email: string;
   role: string;
-  facilityId?: number | null;
+  facilityId?: string | null;
 }
 
 @Injectable()

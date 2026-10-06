@@ -12,10 +12,9 @@ import { Type } from 'class-transformer';
 import { UnitTypeStatus } from '@prisma/client';
 
 export class CreateStorageUnitTypeDto {
-  @Type(() => Number)
-  @IsInt({ message: 'facilityId must be an integer' })
+  @IsString({ message: 'facilityId must be a string' })
   @IsNotEmpty({ message: 'facilityId is required' })
-  facilityId: number;
+  facilityId: string;
 
   @IsString()
   @IsNotEmpty({ message: 'Name is required' })

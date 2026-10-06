@@ -42,7 +42,7 @@ export class OperationsService {
     });
   }
 
-  async getPolicies(policyType?: string, facilityId?: number) {
+  async getPolicies(policyType?: string, facilityId?: string) {
     const where: any = { status: 'ACTIVE' };
     if (policyType) {
       where.policyType = policyType.toUpperCase();
@@ -58,7 +58,7 @@ export class OperationsService {
     });
   }
 
-  async getPolicyById(id: number) {
+  async getPolicyById(id: string) {
     const policy = await this.prisma.policy.findUnique({
       where: { id },
       include: { facility: true },
@@ -98,7 +98,7 @@ export class OperationsService {
     });
   }
 
-  async createExtraCharge(userId: number, dto: CreateExtraChargeDto) {
+  async createExtraCharge(userId: string, dto: CreateExtraChargeDto) {
     const feeType = await this.prisma.feeType.findUnique({
       where: { id: dto.feeTypeId },
     });
@@ -145,7 +145,7 @@ export class OperationsService {
     });
   }
 
-  async getExtraCharges(contractId?: number, reservationId?: number) {
+  async getExtraCharges(contractId?: string, reservationId?: string) {
     const where: any = {};
     if (contractId) where.contractId = contractId;
     if (reservationId) where.reservationId = reservationId;
@@ -215,7 +215,8 @@ export class OperationsService {
       throw new BadRequestException('Mã giảm giá đã hết hạn sử dụng');
     }
 
-    if (discount.maxUsage && discount._count.discountUsages >= discount.maxUsage) {
+    const usageCount = (discount as any)._count?.discountUsages ?? 0;
+    if (discount.maxUsage && usageCount >= discount.maxUsage) {
       throw new BadRequestException('Mã giảm giá đã hết lượt sử dụng');
     }
 

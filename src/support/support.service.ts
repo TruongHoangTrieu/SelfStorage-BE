@@ -31,7 +31,7 @@ export class SupportService {
   /**
    * Khách hàng tạo yêu cầu hỗ trợ sự cố mới
    */
-  async create(userId: number, dto: CreateSupportRequestDto) {
+  async create(userId: string, dto: CreateSupportRequestDto) {
     const facility = await this.prisma.facility.findUnique({
       where: { id: dto.facilityId },
     });
@@ -125,7 +125,7 @@ export class SupportService {
     if (user.role === UserRole.STORAGE_CUSTOMER) {
       where.customerId = user.id;
     } else if (user.role === UserRole.FACILITY_STAFF || user.role === UserRole.FACILITY_MANAGER) {
-      where.facilityId = user.facilityId || -1;
+      where.facilityId = user.facilityId || '000000000000000000000000';
       if (customerId) where.customerId = customerId;
     } else {
       if (customerId) where.customerId = customerId;
@@ -193,7 +193,7 @@ export class SupportService {
   /**
    * Chi tiết yêu cầu hỗ trợ & toàn bộ nhật ký xử lý
    */
-  async findOne(id: number, user: any) {
+  async findOne(id: string, user: any) {
     const request = await this.prisma.supportRequest.findUnique({
       where: { id },
       include: {
@@ -270,7 +270,7 @@ export class SupportService {
   /**
    * Phân công nhân viên xử lý yêu cầu hỗ trợ
    */
-  async assignStaff(id: number, staffId: number, user: any) {
+  async assignStaff(id: string, staffId: string, user: any) {
     const request = await this.prisma.supportRequest.findUnique({
       where: { id },
     });
@@ -328,7 +328,7 @@ export class SupportService {
   /**
    * Cập nhật tiến độ xử lý và trạng thái ticket (Staff / Manager / Admin)
    */
-  async updateProgress(id: number, user: any, dto: UpdateTicketProgressDto) {
+  async updateProgress(id: string, user: any, dto: UpdateTicketProgressDto) {
     const request = await this.prisma.supportRequest.findUnique({
       where: { id },
     });
@@ -389,7 +389,7 @@ export class SupportService {
   /**
    * Khách hàng hoặc Nhân viên trao đổi, thêm ghi chú/phản hồi vào ticket
    */
-  async addNote(id: number, user: any, dto: AddTicketNoteDto) {
+  async addNote(id: string, user: any, dto: AddTicketNoteDto) {
     const request = await this.prisma.supportRequest.findUnique({
       where: { id },
     });

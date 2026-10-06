@@ -15,7 +15,7 @@ export class StorageUnitTypesService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll(facilityId?: number) {
+  async findAll(facilityId?: string) {
     const whereClause: any = {};
     if (facilityId) {
       whereClause.facilityId = facilityId;
@@ -41,7 +41,7 @@ export class StorageUnitTypesService {
           },
         },
       },
-      orderBy: { id: 'asc' },
+      orderBy: { createdAt: 'asc' },
     });
 
     // Add availability count and active price for each unit type
@@ -63,7 +63,7 @@ export class StorageUnitTypesService {
         return {
           ...rest,
           price: activePrice,
-          totalUnits: unitType._count.storageUnits,
+          totalUnits: (unitType as any)._count?.storageUnits ?? 0,
           availableUnits,
         };
       }),
@@ -72,7 +72,7 @@ export class StorageUnitTypesService {
     return unitTypesWithAvailability;
   }
 
-  async findById(id: number) {
+  async findById(id: string) {
     const unitType = await this.prisma.storageUnitType.findUnique({
       where: { id },
       include: {
@@ -112,7 +112,7 @@ export class StorageUnitTypesService {
     return {
       ...rest,
       price: activePrice,
-      totalUnits: unitType._count.storageUnits,
+      totalUnits: (unitType as any)._count?.storageUnits ?? 0,
       availableUnits,
     };
   }
@@ -187,7 +187,7 @@ export class StorageUnitTypesService {
     });
   }
 
-  async update(id: number, dto: UpdateStorageUnitTypeDto) {
+  async update(id: string, dto: UpdateStorageUnitTypeDto) {
     const unitType = await this.prisma.storageUnitType.findUnique({
       where: { id },
     });
@@ -286,7 +286,7 @@ export class StorageUnitTypesService {
     });
   }
 
-  async delete(id: number) {
+  async delete(id: string) {
     const unitType = await this.prisma.storageUnitType.findUnique({
       where: { id },
       include: {
@@ -303,9 +303,12 @@ export class StorageUnitTypesService {
       throw new NotFoundException(`Storage unit type with ID ${id} not found`);
     }
 
-    if (unitType._count.storageUnits > 0 || unitType._count.reservationItems > 0) {
+    const unitsCount = (unitType as any)._count?.storageUnits ?? 0;
+    const resCount = (unitType as any)._count?.reservationItems ?? 0;
+
+    if (unitsCount > 0 || resCount > 0) {
       throw new ConflictException(
-        `Không thể xóa loại ngăn kho này vì đang có ${unitType._count.storageUnits} ô kho hoặc liên kết đặt chỗ liên quan. Vui lòng chuyển trạng thái sang INACTIVE để ngừng cung cấp.`,
+        `Không thể xóa loại ngăn kho này vì đang có ${unitsCount} ô kho hoặc liên kết đặt chỗ liên quan. Vui lòng chuyển trạng thái sang INACTIVE để ngừng cung cấp.`,
       );
     }
 

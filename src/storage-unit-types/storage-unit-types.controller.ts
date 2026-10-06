@@ -8,7 +8,6 @@ import {
   Query,
   Body,
   UseGuards,
-  ParseIntPipe,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
@@ -46,12 +45,12 @@ export class StorageUnitTypesController {
   }
 
   @ApiOperation({ summary: 'Lấy thông tin chi tiết loại ngăn kho theo ID' })
-  @ApiParam({ name: 'id', description: 'ID loại ngăn kho', example: 1 })
+  @ApiParam({ name: 'id', description: 'ID loại ngăn kho' })
   @ApiResponse({ status: 200, description: 'Chi tiết loại ngăn kho' })
   @ApiResponse({ status: 404, description: 'Không tìm thấy loại ngăn kho' })
   @Public()
   @Get(':id')
-  async findById(@Param('id', ParseIntPipe) id: number) {
+  async findById(@Param('id') id: string) {
     return this.storageUnitTypesService.findById(id);
   }
 
@@ -72,7 +71,7 @@ export class StorageUnitTypesController {
 
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Cập nhật loại ngăn kho (Manager / Admin)' })
-  @ApiParam({ name: 'id', description: 'ID loại ngăn kho', example: 1 })
+  @ApiParam({ name: 'id', description: 'ID loại ngăn kho' })
   @ApiResponse({ status: 200, description: 'Cập nhật thành công' })
   @UseGuards(RolesGuard)
   @Roles(
@@ -82,7 +81,7 @@ export class StorageUnitTypesController {
   )
   @Patch(':id')
   async update(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id') id: string,
     @Body() updateDto: UpdateStorageUnitTypeDto,
   ) {
     return this.storageUnitTypesService.update(id, updateDto);
@@ -90,7 +89,7 @@ export class StorageUnitTypesController {
 
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Xóa loại ngăn kho (Manager / Admin - Chỉ xóa khi chưa có ô kho/đơn đặt)' })
-  @ApiParam({ name: 'id', description: 'ID loại ngăn kho', example: 1 })
+  @ApiParam({ name: 'id', description: 'ID loại ngăn kho' })
   @ApiResponse({ status: 200, description: 'Xóa thành công' })
   @ApiResponse({ status: 409, description: 'Không thể xóa vì đã có dữ liệu phụ thuộc' })
   @UseGuards(RolesGuard)
@@ -100,7 +99,7 @@ export class StorageUnitTypesController {
     UserRole.SYSTEM_ADMINISTRATOR,
   )
   @Delete(':id')
-  async delete(@Param('id', ParseIntPipe) id: number) {
+  async delete(@Param('id') id: string) {
     return this.storageUnitTypesService.delete(id);
   }
 }

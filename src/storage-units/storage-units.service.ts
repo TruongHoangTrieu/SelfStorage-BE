@@ -53,11 +53,11 @@ export class StorageUnitsService {
           },
         },
       },
-      orderBy: [{ facilityId: 'asc' }, { unitNumber: 'asc' }],
+      orderBy: [{ unitNumber: 'asc' }],
     });
   }
 
-  async findById(id: number) {
+  async findById(id: string) {
     const unit = await this.prisma.storageUnit.findUnique({
       where: { id },
       include: {
@@ -153,7 +153,7 @@ export class StorageUnitsService {
     });
   }
 
-  async update(id: number, dto: UpdateStorageUnitDto) {
+  async update(id: string, dto: UpdateStorageUnitDto) {
     const existing = await this.prisma.storageUnit.findUnique({
       where: { id },
     });

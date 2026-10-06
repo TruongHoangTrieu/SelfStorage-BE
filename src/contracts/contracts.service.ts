@@ -29,10 +29,10 @@ export class ContractsService {
    * Helper kiểm tra quyền sở hữu hợp đồng của khách hàng
    */
   private async getContractAndValidateOwnership(
-    contractId: number,
-    userId: number,
+    contractId: string,
+    userId: string,
     userRole: string,
-    userFacilityId?: number,
+    userFacilityId?: string,
   ) {
     const contract = await this.prisma.rentalContract.findUnique({
       where: { id: contractId },
@@ -79,7 +79,7 @@ export class ContractsService {
   /**
    * Lấy danh sách hợp đồng của khách hàng đang đăng nhập
    */
-  async getMyContracts(userId: number) {
+  async getMyContracts(userId: string) {
     return this.prisma.rentalContract.findMany({
       where: { customerId: userId },
       include: {
@@ -102,13 +102,13 @@ export class ContractsService {
   /**
    * Lấy danh sách hợp đồng (dành cho Quản lý & Nhân viên)
    */
-  async getContracts(user: any, facilityId?: number, status?: ContractStatus) {
+  async getContracts(user: any, facilityId?: string, status?: ContractStatus) {
     const where: any = {};
     if (status) where.status = status;
 
     const userRole = typeof user.role === 'string' ? user.role : user.role?.name;
     if (userRole === UserRole.FACILITY_STAFF || userRole === UserRole.FACILITY_MANAGER) {
-      const enforcedFacilityId = user.facilityId || -1;
+      const enforcedFacilityId = user.facilityId || '000000000000000000000000';
       where.contractItems = {
         some: {
           unit: { facilityId: enforcedFacilityId },
@@ -147,10 +147,10 @@ export class ContractsService {
    * Lấy chi tiết hợp đồng
    */
   async getContractById(
-    contractId: number,
-    userId: number,
+    contractId: string,
+    userId: string,
     userRole: string,
-    userFacilityId?: number,
+    userFacilityId?: string,
   ) {
     return this.getContractAndValidateOwnership(
       contractId,
@@ -163,7 +163,7 @@ export class ContractsService {
   /**
    * Khách hàng ký điện tử hợp đồng
    */
-  async signContract(contractId: number, userId: number) {
+  async signContract(contractId: string, userId: string) {
     const contract = await this.prisma.rentalContract.findUnique({
       where: { id: contractId },
     });
@@ -192,7 +192,7 @@ export class ContractsService {
   /**
    * Thanh lý / Chấm dứt hợp đồng và giải phóng ngăn kho
    */
-  async terminateContract(contractId: number) {
+  async terminateContract(contractId: string) {
     const contract = await this.prisma.rentalContract.findUnique({
       where: { id: contractId },
       include: { contractItems: true },
@@ -235,9 +235,9 @@ export class ContractsService {
    * Lấy thông tin ổ khóa điện tử và mã PIN mở cửa ngăn kho
    */
   async getSmartLockInfo(
-    contractId: number,
-    unitId: number,
-    userId: number,
+    contractId: string,
+    unitId: string,
+    userId: string,
     userRole?: string,
   ) {
     const contract = await this.prisma.rentalContract.findUnique({
@@ -285,9 +285,9 @@ export class ContractsService {
    * Khách hàng tự đổi mã PIN của ổ khóa thông minh
    */
   async changeSmartLockPin(
-    contractId: number,
-    unitId: number,
-    userId: number,
+    contractId: string,
+    unitId: string,
+    userId: string,
     dto: ChangeSmartLockPinDto,
   ) {
     const contract = await this.prisma.rentalContract.findUnique({
@@ -338,8 +338,8 @@ export class ContractsService {
    * Đặt lại mã PIN ngẫu nhiên hoặc theo chỉ định (Master Reset PIN dành cho Staff/Manager/Admin)
    */
   async resetSmartLockPin(
-    contractId: number,
-    unitId: number,
+    contractId: string,
+    unitId: string,
     dto: ResetSmartLockPinDto,
   ) {
     const item = await this.prisma.contractItem.findFirst({
@@ -373,8 +373,8 @@ export class ContractsService {
    * Tạm khóa hoặc kích hoạt lại mã mở cửa kho (Staff / Manager)
    */
   async updateSmartLockStatus(
-    contractId: number,
-    unitId: number,
+    contractId: string,
+    unitId: string,
     dto: UpdateSmartLockStatusDto,
   ) {
     const item = await this.prisma.contractItem.findFirst({
@@ -403,9 +403,9 @@ export class ContractsService {
    * Xem danh sách đồ đạc đang cất trong ngăn kho
    */
   async getStoredItems(
-    contractId: number,
-    unitId: number,
-    userId: number,
+    contractId: string,
+    unitId: string,
+    userId: string,
     userRole: string,
   ) {
     await this.getContractAndValidateOwnership(contractId, userId, userRole);
@@ -428,9 +428,9 @@ export class ContractsService {
    * Thêm món đồ mới vào kho
    */
   async createStoredItem(
-    contractId: number,
-    unitId: number,
-    userId: number,
+    contractId: string,
+    unitId: string,
+    userId: string,
     userRole: string,
     dto: CreateStoredItemDto,
   ) {
@@ -460,8 +460,8 @@ export class ContractsService {
    * Cập nhật thông tin đồ đạc
    */
   async updateStoredItem(
-    itemId: number,
-    userId: number,
+    itemId: string,
+    userId: string,
     userRole: string,
     dto: UpdateStoredItemDto,
   ) {
@@ -500,7 +500,7 @@ export class ContractsService {
   /**
    * Xóa món đồ khi mang ra khỏi kho
    */
-  async deleteStoredItem(itemId: number, userId: number, userRole: string) {
+  async deleteStoredItem(itemId: string, userId: string, userRole: string) {
     const storedItem = await this.prisma.storedItem.findUnique({
       where: { id: itemId },
       include: {

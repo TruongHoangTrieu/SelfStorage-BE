@@ -7,7 +7,6 @@ import {
   Query,
   Headers,
   UseGuards,
-  ParseIntPipe,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
@@ -69,11 +68,11 @@ export class PaymentsController {
     description:
       'Kiểm tra tiền cọc đã đóng hay chưa (Deposit Paid), tính toán số tiền thuê còn lại cần thu (Remaining Rental Amount) để chuẩn bị Check-in / Bàn giao.',
   })
-  @ApiParam({ name: 'reservationId', description: 'ID đơn đặt chỗ', example: 1 })
+  @ApiParam({ name: 'reservationId', description: 'ID đơn đặt chỗ' })
   @ApiResponse({ status: 200, description: 'Thông tin tổng hợp thanh toán' })
   @Get('reservations/:reservationId/summary')
   async getReservationPaymentSummary(
-    @Param('reservationId', ParseIntPipe) reservationId: number,
+    @Param('reservationId') reservationId: string,
     @CurrentUser() user: any,
   ) {
     const userRole = typeof user.role === 'string' ? user.role : user.role?.name;
@@ -143,12 +142,12 @@ export class PaymentsController {
 
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Xem chi tiết một giao dịch thanh toán theo ID' })
-  @ApiParam({ name: 'id', description: 'ID giao dịch thanh toán', example: 1 })
+  @ApiParam({ name: 'id', description: 'ID giao dịch thanh toán' })
   @ApiResponse({ status: 200, description: 'Chi tiết giao dịch thanh toán' })
   @ApiResponse({ status: 404, description: 'Không tìm thấy giao dịch thanh toán' })
   @Get(':id')
   async findById(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id') id: string,
     @CurrentUser() user: any,
   ) {
     return this.paymentsService.findById(id, user);

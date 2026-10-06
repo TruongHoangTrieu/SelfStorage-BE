@@ -16,14 +16,12 @@ export class FilterSupportRequestDto {
   limit?: number = 10;
 
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  facilityId?: number;
+  @IsString()
+  facilityId?: string;
 
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  customerId?: number;
+  @IsString()
+  customerId?: string;
 
   @IsOptional()
   @IsEnum(SupportStatus)

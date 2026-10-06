@@ -18,7 +18,6 @@ import {
   PaymentType,
   PaymentMethod,
   ReservationStatus,
-  StorageUnitStatus,
   Prisma,
 } from '@prisma/client';
 import { UserRole } from '../common/enums/role.enum';
@@ -37,7 +36,7 @@ export class PaymentsService {
    * Generates a DEPOSIT payment with unique payment code and VietQR instructions.
    */
   async createDepositPayment(
-    customerId: number,
+    customerId: string,
     dto: CreateDepositPaymentDto,
     userRole: string = UserRole.STORAGE_CUSTOMER,
   ) {
@@ -124,12 +123,12 @@ export class PaymentsService {
     }
 
     // 6. Calculate deposit amount strictly from database (ReservationItem deposit amounts)
-    let totalDeposit = new Prisma.Decimal(0);
+    let totalDeposit = 0;
     for (const item of reservation.items) {
-      totalDeposit = totalDeposit.add(item.depositAmount);
+      totalDeposit += Number(item.depositAmount);
     }
 
-    if (totalDeposit.lessThanOrEqualTo(0)) {
+    if (totalDeposit <= 0) {
       throw new BadRequestException(
         'Calculated deposit amount must be greater than 0',
       );
@@ -178,8 +177,8 @@ export class PaymentsService {
    * Checks whether Deposit is paid and calculates remaining Rental amount.
    */
   async getReservationPaymentSummary(
-    reservationId: number,
-    userId: number,
+    reservationId: string,
+    userId: string,
     userRole: string,
   ) {
     const reservation = await this.prisma.reservation.findUnique({
@@ -213,16 +212,16 @@ export class PaymentsService {
     }
 
     // Calculate total deposit and rental amounts from items
-    let depositRequired = new Prisma.Decimal(0);
-    let rentalPerPeriod = new Prisma.Decimal(0);
+    let depositRequired = 0;
+    let rentalPerPeriod = 0;
 
     for (const item of reservation.items) {
-      depositRequired = depositRequired.add(item.depositAmount);
-      rentalPerPeriod = rentalPerPeriod.add(item.price);
+      depositRequired += Number(item.depositAmount);
+      rentalPerPeriod += Number(item.price);
     }
 
-    const totalRentalAmount = rentalPerPeriod.mul(reservation.rentalPeriod);
-    const estimatedGrandTotal = totalRentalAmount.add(depositRequired);
+    const totalRentalAmount = rentalPerPeriod * reservation.rentalPeriod;
+    const estimatedGrandTotal = totalRentalAmount + depositRequired;
 
     // Find paid deposit and rental payments
     const depositPayment = reservation.payments.find(
@@ -237,13 +236,13 @@ export class PaymentsService {
 
     let remainingAmountToPay = estimatedGrandTotal;
     if (depositPaid) {
-      remainingAmountToPay = remainingAmountToPay.sub(depositPayment.amount);
+      remainingAmountToPay -= Number(depositPayment.amount);
     }
     if (rentalPaid) {
-      remainingAmountToPay = remainingAmountToPay.sub(rentalPayment.amount);
+      remainingAmountToPay -= Number(rentalPayment.amount);
     }
-    if (remainingAmountToPay.lessThan(0)) {
-      remainingAmountToPay = new Prisma.Decimal(0);
+    if (remainingAmountToPay < 0) {
+      remainingAmountToPay = 0;
     }
 
     return {
@@ -268,7 +267,7 @@ export class PaymentsService {
    * Prevents charging deposit twice and creates RENTAL payment for the remaining rental fee.
    */
   async createRentalPayment(
-    userId: number,
+    userId: string,
     dto: CreateRentalPaymentDto,
     userRole: string = UserRole.STORAGE_CUSTOMER,
   ) {
@@ -337,13 +336,13 @@ export class PaymentsService {
     }
 
     // Calculate rental amount (item.price * rentalPeriod)
-    let totalRental = new Prisma.Decimal(0);
+    let totalRental = 0;
     for (const item of reservation.items) {
-      totalRental = totalRental.add(item.price);
+      totalRental += Number(item.price);
     }
-    const rentalAmount = totalRental.mul(reservation.rentalPeriod);
+    const rentalAmount = totalRental * reservation.rentalPeriod;
 
-    if (rentalAmount.lessThanOrEqualTo(0)) {
+    if (rentalAmount <= 0) {
       throw new BadRequestException(
         'Calculated rental amount must be greater than 0',
       );
@@ -442,7 +441,6 @@ export class PaymentsService {
     }
 
     // 5. IDEMPOTENCY CHECK
-    // If the payment is already marked as PAID, do not apply changes again.
     if (payment.status === PaymentStatus.PAID) {
       this.logger.log(
         `Payment ${paymentCode} is already PAID. Transaction reference: ${payment.transactionReference}. Idempotent response returned.`,
@@ -482,7 +480,6 @@ export class PaymentsService {
     }
 
     // 7. ATOMIC PRISMA TRANSACTION
-    // Mark Payment = PAID and (for DEPOSIT) update Reservation = CONFIRMED atomically.
     const transactionDate = payload.transactionDate
       ? new Date(payload.transactionDate)
       : new Date();
@@ -611,7 +608,7 @@ export class PaymentsService {
   /**
    * Get payment details by ID
    */
-  async findById(id: number, user: any) {
+  async findById(id: string, user: any) {
     const payment = await this.prisma.payment.findUnique({
       where: { id },
       include: {

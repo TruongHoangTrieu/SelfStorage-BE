@@ -3,7 +3,6 @@ import {
   IsNotEmpty,
   IsOptional,
   IsEnum,
-  IsInt,
   IsDateString,
   IsDefined,
 } from 'class-validator';
@@ -11,8 +10,8 @@ import { PolicyValueType, PolicyStatus } from '@prisma/client';
 
 export class CreatePolicyDto {
   @IsOptional()
-  @IsInt()
-  facilityId?: number;
+  @IsString()
+  facilityId?: string;
 
   @IsString()
   @IsNotEmpty()

@@ -2,7 +2,6 @@ import {
   IsString,
   IsNotEmpty,
   IsOptional,
-  IsInt,
   IsNumber,
   Min,
 } from 'class-validator';
@@ -10,16 +9,16 @@ import { Type } from 'class-transformer';
 
 export class CreateExtraChargeDto {
   @IsOptional()
-  @IsInt()
-  contractId?: number;
+  @IsString()
+  contractId?: string;
 
   @IsOptional()
-  @IsInt()
-  reservationId?: number;
+  @IsString()
+  reservationId?: string;
 
-  @IsInt()
+  @IsString()
   @IsNotEmpty()
-  feeTypeId: number;
+  feeTypeId: string;
 
   @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 2 })

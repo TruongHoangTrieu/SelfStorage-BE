@@ -7,9 +7,9 @@ import {
 } from 'class-validator';
 
 export class AssignStaffDto {
-  @IsInt()
+  @IsString()
   @IsNotEmpty()
-  userId: number;
+  userId: string;
 
   @IsString()
   @IsNotEmpty()

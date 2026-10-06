@@ -98,18 +98,18 @@ export class AuthService {
     };
   }
 
-  async logout(userId: number) {
+  async logout(userId: string) {
     this.logger.log(`User ID ${userId} logged out successfully`);
     return {
       message: 'Logged out successfully',
     };
   }
 
-  async updateProfile(userId: number, dto: UpdateProfileDto) {
+  async updateProfile(userId: string, dto: UpdateProfileDto) {
     return this.usersService.updateProfile(userId, dto);
   }
 
-  async changePassword(userId: number, dto: ChangePasswordDto) {
+  async changePassword(userId: string, dto: ChangePasswordDto) {
     return this.usersService.changePassword(
       userId,
       dto.currentPassword,

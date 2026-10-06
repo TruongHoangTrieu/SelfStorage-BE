@@ -3,29 +3,23 @@ import {
   NotFoundException,
   ConflictException,
   BadRequestException,
-  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { CreateFacilityDto } from './dto/create-facility.dto';
 import { UpdateFacilityDto } from './dto/update-facility.dto';
 import { AssignStaffDto, EndStaffAssignmentDto } from './dto/assign-staff.dto';
-import {
-  FacilityStatus,
-  StorageUnitStatus,
-  UserStatus,
-  ReservationStatus,
-  PolicyStatus,
-} from '@prisma/client';
+import { FacilityStatus, StorageUnitStatus, PolicyStatus, ReservationStatus } from '@prisma/client';
 
 @Injectable()
 export class FacilitiesService {
-  private readonly logger = new Logger(FacilitiesService.name);
-
   constructor(private readonly prisma: PrismaService) {}
 
   async findAll() {
     const facilities = await this.prisma.facility.findMany({
       include: {
+        storageUnitTypes: {
+          where: { status: 'ACTIVE' },
+        },
         _count: {
           select: {
             storageUnits: true,
@@ -33,10 +27,9 @@ export class FacilitiesService {
           },
         },
       },
-      orderBy: { id: 'asc' },
+      orderBy: { createdAt: 'desc' },
     });
 
-    // Compute available units for each facility
     const facilitiesWithAvailability = await Promise.all(
       facilities.map(async (facility) => {
         const availableUnits = await this.prisma.storageUnit.count({
@@ -46,11 +39,14 @@ export class FacilitiesService {
           },
         });
 
+        const totalUnits = (facility as any)._count?.storageUnits ?? ((facility as any).storageUnits?.length ?? 0);
+        const totalUnitTypes = (facility as any)._count?.storageUnitTypes ?? (facility.storageUnitTypes?.length ?? 0);
+
         return {
           ...facility,
-          totalUnits: facility._count.storageUnits,
+          totalUnits,
           availableUnits,
-          totalUnitTypes: facility._count.storageUnitTypes,
+          totalUnitTypes,
         };
       }),
     );
@@ -58,13 +54,12 @@ export class FacilitiesService {
     return facilitiesWithAvailability;
   }
 
-  async findById(id: number) {
+  async findById(id: string) {
     const facility = await this.prisma.facility.findUnique({
       where: { id },
       include: {
         storageUnitTypes: {
           where: { status: 'ACTIVE' },
-          orderBy: { id: 'asc' },
         },
         _count: {
           select: {
@@ -86,11 +81,14 @@ export class FacilitiesService {
       },
     });
 
+    const totalUnits = (facility as any)._count?.storageUnits ?? ((facility as any).storageUnits?.length ?? 0);
+    const totalUnitTypes = (facility as any)._count?.storageUnitTypes ?? (facility.storageUnitTypes?.length ?? 0);
+
     return {
       ...facility,
-      totalUnits: facility._count.storageUnits,
+      totalUnits,
       availableUnits,
-      totalUnitTypes: facility._count.storageUnitTypes,
+      totalUnitTypes,
     };
   }
 
@@ -105,7 +103,7 @@ export class FacilitiesService {
       throw new ConflictException(`Facility code '${code}' already exists`);
     }
 
-    return (this.prisma.facility.create as any)({
+    return this.prisma.facility.create({
       data: {
         name: dto.name.trim(),
         code,
@@ -119,7 +117,7 @@ export class FacilitiesService {
     });
   }
 
-  async update(id: number, dto: UpdateFacilityDto) {
+  async update(id: string, dto: UpdateFacilityDto) {
     const facility = await this.prisma.facility.findUnique({
       where: { id },
     });
@@ -167,7 +165,7 @@ export class FacilitiesService {
   /**
    * Phân công nhân viên vào cơ sở kho
    */
-  async assignStaff(facilityId: number, dto: AssignStaffDto) {
+  async assignStaff(facilityId: string, dto: AssignStaffDto) {
     const facility = await this.prisma.facility.findUnique({
       where: { id: facilityId },
     });
@@ -229,7 +227,7 @@ export class FacilitiesService {
   /**
    * Lấy danh sách nhân viên đang làm việc tại một cơ sở
    */
-  async getStaffByFacility(facilityId: number, includeEnded: boolean = false) {
+  async getStaffByFacility(facilityId: string, includeEnded: boolean = false) {
     const facility = await this.prisma.facility.findUnique({
       where: { id: facilityId },
     });
@@ -271,7 +269,7 @@ export class FacilitiesService {
    * Kết thúc phân công nhân viên (rời khỏi cơ sở)
    */
   async endStaffAssignment(
-    assignmentId: number,
+    assignmentId: string,
     dto: EndStaffAssignmentDto,
   ) {
     const assignment = await this.prisma.staffFacilityAssignment.findUnique({
@@ -313,7 +311,7 @@ export class FacilitiesService {
    * Sơ đồ tổng quan ngăn kho theo cơ sở (Storage Layout)
    * Nhóm theo tầng (floor), trạng thái, loại kho
    */
-  async getStorageLayout(facilityId: number) {
+  async getStorageLayout(facilityId: string) {
     const facility = await this.prisma.facility.findUnique({
       where: { id: facilityId },
     });
@@ -390,7 +388,7 @@ export class FacilitiesService {
    * Danh sách yêu cầu hỗ trợ tại một cơ sở (dành cho Staff/Manager)
    */
   async getSupportRequests(
-    facilityId: number,
+    facilityId: string,
     status?: string,
     priority?: string,
   ) {
@@ -437,7 +435,7 @@ export class FacilitiesService {
   /**
    * Phân công nhân viên xử lý yêu cầu hỗ trợ
    */
-  async assignSupportRequest(requestId: number, staffId: number) {
+  async assignSupportRequest(requestId: string, staffId: string) {
     const request = await this.prisma.supportRequest.findUnique({
       where: { id: requestId },
     });
@@ -477,7 +475,7 @@ export class FacilitiesService {
    * Ưu tiên cấu hình trong bảng Policy theo facilityId hoặc toàn hệ thống.
    * Nếu chưa cấu hình trong DB, trả về danh sách gói chuẩn.
    */
-  async getRentalDurations(facilityId: number) {
+  async getRentalDurations(facilityId: string) {
     const facility = await this.prisma.facility.findUnique({
       where: { id: facilityId },
     });
@@ -513,7 +511,7 @@ export class FacilitiesService {
    * Lấy danh sách khung giờ hẹn dọn đồ vào khả dụng theo ngày (Flow đặt chỗ)
    * Tính toán dựa trên số lượng đơn đặt chỗ hiện có để tránh quá tải cùng khung giờ.
    */
-  async getAvailableTimeSlots(facilityId: number, dateStr?: string) {
+  async getAvailableTimeSlots(facilityId: string, dateStr?: string) {
     const facility = await this.prisma.facility.findUnique({
       where: { id: facilityId },
     });
@@ -651,8 +649,7 @@ export class FacilitiesService {
 
       // Nếu là ngày hôm nay, kiểm tra xem ca đó đã qua giờ hiện tại chưa
       if (isToday) {
-        const slotStartTimeToday = new Date(targetDate);
-        slotStartTimeToday.setHours(slot.startHour, slot.startMinute, 0, 0);
+        const slotStartTimeToday = new Date(`${dateStr}${slot.iso}`);
         if (now > slotStartTimeToday) {
           available = false;
           reason = 'Đã qua khung giờ này';
@@ -683,4 +680,3 @@ export class FacilitiesService {
     };
   }
 }
-

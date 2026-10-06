@@ -1,4 +1,4 @@
-import { IsEnum, IsInt, IsOptional, Min } from 'class-validator';
+import { IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ReservationStatus } from '@prisma/client';
 
@@ -16,14 +16,12 @@ export class FilterReservationDto {
   limit?: number = 10;
 
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  facilityId?: number;
+  @IsString()
+  facilityId?: string;
 
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  customerId?: number;
+  @IsString()
+  customerId?: string;
 
   @IsOptional()
   @IsEnum(ReservationStatus)
@@ -34,8 +32,10 @@ export class FilterReservationDto {
   excludeStatus?: ReservationStatus;
 
   @IsOptional()
+  @IsString()
   search?: string;
 
   @IsOptional()
+  @IsString()
   phone?: string;
 }

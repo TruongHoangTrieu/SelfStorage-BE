@@ -1,17 +1,14 @@
-import { IsEnum, IsInt, IsOptional } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsEnum, IsOptional, IsString } from 'class-validator';
 import { StorageUnitStatus } from '@prisma/client';
 
 export class FilterStorageUnitDto {
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  facilityId?: number;
+  @IsString()
+  facilityId?: string;
 
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  unitTypeId?: number;
+  @IsString()
+  unitTypeId?: string;
 
   @IsOptional()
   @IsEnum(StorageUnitStatus)

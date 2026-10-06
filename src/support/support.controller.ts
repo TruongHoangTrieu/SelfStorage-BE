@@ -7,7 +7,6 @@ import {
   Param,
   Query,
   UseGuards,
-  ParseIntPipe,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
@@ -17,7 +16,6 @@ import {
   ApiResponse,
   ApiBearerAuth,
   ApiParam,
-  ApiQuery,
 } from '@nestjs/swagger';
 import { SupportService } from './support.service';
 import { CreateSupportRequestDto } from './dto/create-support-request.dto';
@@ -62,20 +60,20 @@ export class SupportController {
   }
 
   @ApiOperation({ summary: 'Xem chi tiết yêu cầu hỗ trợ kèm toàn bộ lịch sử tiến độ & nhật ký xử lý' })
-  @ApiParam({ name: 'id', description: 'ID yêu cầu hỗ trợ', example: 1 })
+  @ApiParam({ name: 'id', description: 'ID yêu cầu hỗ trợ' })
   @ApiResponse({ status: 200, description: 'Chi tiết ticket kèm nhật ký' })
   @ApiResponse({ status: 403, description: 'Không có quyền xem ticket của khách hàng khác' })
   @ApiResponse({ status: 404, description: 'Không tìm thấy ticket' })
   @Get(':id')
   async findOne(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id') id: string,
     @CurrentUser() user: any,
   ) {
     return this.supportService.findOne(id, user);
   }
 
   @ApiOperation({ summary: 'Phân công nhân viên tiếp nhận xử lý ticket (Manager / Admin)' })
-  @ApiParam({ name: 'id', description: 'ID yêu cầu hỗ trợ', example: 1 })
+  @ApiParam({ name: 'id', description: 'ID yêu cầu hỗ trợ' })
   @ApiResponse({ status: 200, description: 'Phân công nhân viên thành công' })
   @Roles(
     UserRole.FACILITY_MANAGER,
@@ -84,7 +82,7 @@ export class SupportController {
   )
   @Patch(':id/assign')
   async assignStaff(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id') id: string,
     @Body() dto: AssignStaffTicketDto,
     @CurrentUser() user: any,
   ) {
@@ -92,7 +90,7 @@ export class SupportController {
   }
 
   @ApiOperation({ summary: 'Cập nhật tiến độ & trạng thái xử lý ticket (Staff / Manager / Admin)' })
-  @ApiParam({ name: 'id', description: 'ID yêu cầu hỗ trợ', example: 1 })
+  @ApiParam({ name: 'id', description: 'ID yêu cầu hỗ trợ' })
   @ApiResponse({ status: 200, description: 'Cập nhật tiến độ thành công' })
   @Roles(
     UserRole.FACILITY_STAFF,
@@ -102,7 +100,7 @@ export class SupportController {
   )
   @Patch(':id/progress')
   async updateProgress(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id') id: string,
     @CurrentUser() user: any,
     @Body() dto: UpdateTicketProgressDto,
   ) {
@@ -110,12 +108,12 @@ export class SupportController {
   }
 
   @ApiOperation({ summary: 'Khách hàng hoặc Nhân viên trao đổi, thêm ghi chú/phản hồi vào ticket' })
-  @ApiParam({ name: 'id', description: 'ID yêu cầu hỗ trợ', example: 1 })
+  @ApiParam({ name: 'id', description: 'ID yêu cầu hỗ trợ' })
   @ApiResponse({ status: 201, description: 'Thêm ghi chú thành công' })
   @Post(':id/notes')
   @HttpCode(HttpStatus.CREATED)
   async addNote(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id') id: string,
     @CurrentUser() user: any,
     @Body() dto: AddTicketNoteDto,
   ) {

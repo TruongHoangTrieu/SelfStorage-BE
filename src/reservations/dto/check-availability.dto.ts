@@ -1,24 +1,23 @@
 import {
-  IsInt,
   IsNotEmpty,
   IsOptional,
   IsDateString,
+  IsString,
   Min,
   IsEnum,
+  IsInt,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ReservationRentalPeriodUnit } from '@prisma/client';
 
 export class CheckAvailabilityDto {
-  @Type(() => Number)
-  @IsInt({ message: 'facilityId must be an integer' })
+  @IsString({ message: 'facilityId must be a string' })
   @IsNotEmpty({ message: 'facilityId is required' })
-  facilityId: number;
+  facilityId: string;
 
-  @Type(() => Number)
-  @IsInt({ message: 'unitTypeId must be an integer' })
+  @IsString({ message: 'unitTypeId must be a string' })
   @IsNotEmpty({ message: 'unitTypeId is required' })
-  unitTypeId: number;
+  unitTypeId: string;
 
   @IsOptional()
   @IsDateString()
