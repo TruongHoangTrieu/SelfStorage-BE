@@ -54,29 +54,67 @@ export class FacilitiesService {
     return facilitiesWithAvailability;
   }
 
-  async findById(id: string) {
-    const facility = await this.prisma.facility.findUnique({
-      where: { id },
-      include: {
-        storageUnitTypes: {
-          where: { status: 'ACTIVE' },
-        },
-        _count: {
-          select: {
-            storageUnits: true,
-            storageUnitTypes: true,
-          },
-        },
-      },
+  private isObjectId(val: string): boolean {
+    return typeof val === 'string' && /^[0-9a-fA-F]{24}$/.test(val);
+  }
+
+  private async resolveFacility(idOrCode: string) {
+    if (!idOrCode) return null;
+    if (this.isObjectId(idOrCode)) {
+      const fac = await this.prisma.facility.findUnique({
+        where: { id: idOrCode },
+      });
+      if (fac) return fac;
+    }
+    // Fallback: look up by code
+    return this.prisma.facility.findUnique({
+      where: { code: idOrCode },
     });
+  }
+
+  async findById(id: string) {
+    const isMongoId = this.isObjectId(id);
+    let facility = isMongoId
+      ? await this.prisma.facility.findUnique({
+          where: { id },
+          include: {
+            storageUnitTypes: {
+              where: { status: 'ACTIVE' },
+            },
+            _count: {
+              select: {
+                storageUnits: true,
+                storageUnitTypes: true,
+              },
+            },
+          },
+        })
+      : null;
 
     if (!facility) {
-      throw new NotFoundException(`Facility with ID ${id} not found`);
+      facility = await this.prisma.facility.findUnique({
+        where: { code: id },
+        include: {
+          storageUnitTypes: {
+            where: { status: 'ACTIVE' },
+          },
+          _count: {
+            select: {
+              storageUnits: true,
+              storageUnitTypes: true,
+            },
+          },
+        },
+      });
+    }
+
+    if (!facility) {
+      throw new NotFoundException(`Facility with ID or code '${id}' not found`);
     }
 
     const availableUnits = await this.prisma.storageUnit.count({
       where: {
-        facilityId: id,
+        facilityId: facility.id,
         status: StorageUnitStatus.AVAILABLE,
       },
     });
@@ -228,14 +266,12 @@ export class FacilitiesService {
    * Lấy danh sách nhân viên đang làm việc tại một cơ sở
    */
   async getStaffByFacility(facilityId: string, includeEnded: boolean = false) {
-    const facility = await this.prisma.facility.findUnique({
-      where: { id: facilityId },
-    });
+    const facility = await this.resolveFacility(facilityId);
     if (!facility) {
-      throw new NotFoundException(`Facility with ID ${facilityId} not found`);
+      throw new NotFoundException(`Facility with ID or code '${facilityId}' not found`);
     }
 
-    const where: any = { facilityId };
+    const where: any = { facilityId: facility.id };
     if (!includeEnded) {
       where.endedAt = null;
     }
@@ -312,15 +348,13 @@ export class FacilitiesService {
    * Nhóm theo tầng (floor), trạng thái, loại kho
    */
   async getStorageLayout(facilityId: string) {
-    const facility = await this.prisma.facility.findUnique({
-      where: { id: facilityId },
-    });
+    const facility = await this.resolveFacility(facilityId);
     if (!facility) {
-      throw new NotFoundException(`Facility with ID ${facilityId} not found`);
+      throw new NotFoundException(`Facility with ID or code '${facilityId}' not found`);
     }
 
     const units = await this.prisma.storageUnit.findMany({
-      where: { facilityId },
+      where: { facilityId: facility.id },
       include: {
         unitType: {
           select: {
@@ -392,14 +426,12 @@ export class FacilitiesService {
     status?: string,
     priority?: string,
   ) {
-    const facility = await this.prisma.facility.findUnique({
-      where: { id: facilityId },
-    });
+    const facility = await this.resolveFacility(facilityId);
     if (!facility) {
-      throw new NotFoundException(`Facility with ID ${facilityId} not found`);
+      throw new NotFoundException(`Facility with ID or code '${facilityId}' not found`);
     }
 
-    const where: any = { facilityId };
+    const where: any = { facilityId: facility.id };
     if (status) where.status = status;
     if (priority) where.priority = priority;
 
@@ -476,11 +508,9 @@ export class FacilitiesService {
    * Nếu chưa cấu hình trong DB, trả về danh sách gói chuẩn.
    */
   async getRentalDurations(facilityId: string) {
-    const facility = await this.prisma.facility.findUnique({
-      where: { id: facilityId },
-    });
+    const facility = await this.resolveFacility(facilityId);
     if (!facility) {
-      throw new NotFoundException(`Facility with ID ${facilityId} not found`);
+      throw new NotFoundException(`Facility with ID or code '${facilityId}' not found`);
     }
 
     // Tìm policy chiết khấu theo thời hạn thuê
@@ -488,7 +518,7 @@ export class FacilitiesService {
       where: {
         policyType: 'RENTAL_DURATION_DISCOUNT',
         status: PolicyStatus.ACTIVE,
-        OR: [{ facilityId }, { facilityId: null }],
+        OR: [{ facilityId: facility.id }, { facilityId: null }],
       },
       orderBy: { facilityId: 'desc' }, // specific facility overrides global
     });
@@ -512,11 +542,9 @@ export class FacilitiesService {
    * Tính toán dựa trên số lượng đơn đặt chỗ hiện có để tránh quá tải cùng khung giờ.
    */
   async getAvailableTimeSlots(facilityId: string, dateStr?: string) {
-    const facility = await this.prisma.facility.findUnique({
-      where: { id: facilityId },
-    });
+    const facility = await this.resolveFacility(facilityId);
     if (!facility) {
-      throw new NotFoundException(`Facility with ID ${facilityId} not found`);
+      throw new NotFoundException(`Facility with ID or code '${facilityId}' not found`);
     }
 
     const defaultSlots = [

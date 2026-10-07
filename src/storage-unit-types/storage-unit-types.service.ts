@@ -18,7 +18,21 @@ export class StorageUnitTypesService {
   async findAll(facilityId?: string) {
     const whereClause: any = {};
     if (facilityId) {
-      whereClause.facilityId = facilityId;
+      const isObjectId = /^[0-9a-fA-F]{24}$/.test(facilityId);
+      if (isObjectId) {
+        whereClause.facilityId = facilityId;
+      } else {
+        // Try resolving by facility code
+        const fac = await this.prisma.facility.findUnique({
+          where: { code: facilityId },
+        });
+        if (fac) {
+          whereClause.facilityId = fac.id;
+        } else {
+          // Neither ObjectId nor valid facility code -> return empty list safely
+          return [];
+        }
+      }
     }
 
     const unitTypes = await this.prisma.storageUnitType.findMany({
