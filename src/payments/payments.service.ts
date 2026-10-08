@@ -583,6 +583,9 @@ export class PaymentsService {
               reservationCode: true,
               customerId: true,
               status: true,
+              customer: {
+                select: { id: true, fullName: true, email: true, phone: true },
+              },
             },
           },
           contract: {
@@ -591,14 +594,22 @@ export class PaymentsService {
               contractCode: true,
               customerId: true,
               status: true,
+              customer: {
+                select: { id: true, fullName: true, email: true, phone: true },
+              },
             },
           },
         },
       }),
     ]);
 
+    const enrichedData = data.map((item: any) => ({
+      ...item,
+      customer: item.contract?.customer || item.reservation?.customer || null,
+    }));
+
     return {
-      data,
+      data: enrichedData,
       pagination: {
         total,
         page,
@@ -650,4 +661,80 @@ export class PaymentsService {
 
     return payment;
   }
+
+  /**
+   * Khách hàng thanh toán gia hạn hợp đồng thuê kho (Flow 3)
+   */
+  async extendContractPayment(
+    userId: number,
+    dto: { contractId?: number; contractCode?: string; months: number; amount: number; paymentMethod?: string },
+  ) {
+    let contract = null;
+    if (dto.contractId) {
+      contract = await this.prisma.rentalContract.findUnique({
+        where: { id: Number(dto.contractId) },
+        include: { customer: true, reservation: true },
+      });
+    } else if (dto.contractCode) {
+      contract = await this.prisma.rentalContract.findFirst({
+        where: { contractCode: String(dto.contractCode) },
+        include: { customer: true, reservation: true },
+      });
+    }
+
+    if (!contract) {
+      contract = await this.prisma.rentalContract.findFirst({
+        where: { customerId: userId, status: 'ACTIVE' as any },
+        include: { customer: true, reservation: true },
+      });
+    }
+
+    if (!contract) {
+      throw new NotFoundException('Không tìm thấy hợp đồng để gia hạn');
+    }
+
+    const paymentCode = `PAY-REN-${Date.now().toString().slice(-6)}`;
+    const method =
+      dto.paymentMethod === 'card'
+        ? PaymentMethod.CARD
+        : dto.paymentMethod === 'bank'
+        ? PaymentMethod.MOMO
+        : dto.paymentMethod === 'vnpay'
+        ? PaymentMethod.VNPAY
+        : PaymentMethod.BANK_TRANSFER;
+
+    const payment = await this.prisma.payment.create({
+      data: {
+        paymentCode,
+        contractId: contract.id,
+        reservationId: contract.reservationId,
+        paymentType: PaymentType.RENTAL,
+        amount: new Prisma.Decimal(dto.amount || 2500000),
+        paymentMethod: method,
+        transactionReference: `SEPAY_QR_${Math.floor(100000 + Math.random() * 900000)}`,
+        status: PaymentStatus.PAID,
+        paidAt: new Date(),
+      },
+    });
+
+    const currentEnd = new Date(contract.endDate);
+    const newEnd = new Date(currentEnd);
+    newEnd.setMonth(newEnd.getMonth() + Number(dto.months || 1));
+
+    const updatedContract = await this.prisma.rentalContract.update({
+      where: { id: contract.id },
+      data: { endDate: newEnd, status: 'ACTIVE' as any },
+    });
+
+    return {
+      success: true,
+      message: `Đã thanh toán gia hạn thành công ${dto.months} tháng cho hợp đồng ${contract.contractCode}`,
+      payment: {
+        ...payment,
+        customer: contract.customer,
+      },
+      newEndDate: updatedContract.endDate,
+    };
+  }
+
 }

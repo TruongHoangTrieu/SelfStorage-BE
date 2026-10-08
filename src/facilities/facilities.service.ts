@@ -651,8 +651,7 @@ export class FacilitiesService {
 
       // Nếu là ngày hôm nay, kiểm tra xem ca đó đã qua giờ hiện tại chưa
       if (isToday) {
-        const slotStartTimeToday = new Date(targetDate);
-        slotStartTimeToday.setHours(slot.startHour, slot.startMinute, 0, 0);
+        const slotStartTimeToday = new Date(`${dateStr}${slot.iso}`);
         if (now > slotStartTimeToday) {
           available = false;
           reason = 'Đã qua khung giờ này';

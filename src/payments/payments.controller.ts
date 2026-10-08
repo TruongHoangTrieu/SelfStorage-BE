@@ -102,6 +102,18 @@ export class PaymentsController {
     return this.paymentsService.createRentalPayment(user.id, dto, userRole);
   }
 
+  
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Khách hàng thanh toán gia hạn hợp đồng thuê kho (Flow 3)' })
+  @Post('extend')
+  @HttpCode(HttpStatus.CREATED)
+  async extendContractPayment(
+    @CurrentUser() user: any,
+    @Body() dto: { contractId?: number; contractCode?: string; months: number; amount: number; paymentMethod?: string },
+  ) {
+    return this.paymentsService.extendContractPayment(user.id, dto);
+  }
+
   // ==================== SEPAY WEBHOOK ====================
 
   @Public()
