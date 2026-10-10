@@ -13,17 +13,17 @@ export class SePayService {
    * Matches patterns like: SSDEP1001A2B3, SSREN1001A2B3, or custom payment codes.
    */
   extractPaymentCode(payload: SePayWebhookPayload): string | null {
-    // 1. If SePay pre-parsed code property exists
-    if (payload.code && typeof payload.code === 'string' && payload.code.trim().length > 0) {
-      return payload.code.trim().toUpperCase();
+    // 1. Prioritize extracting from content using Regex to preserve exact case created by system
+    if (payload.content) {
+      const match = payload.content.match(/(SSDEP[A-Za-z0-9]+|SSREN[A-Za-z0-9]+|PAY[A-Za-z0-9]+)/i);
+      if (match && match[1]) {
+        return match[1].trim();
+      }
     }
 
-    // 2. Extract from content using Regex: match SSDEP... or SSREN... or general code pattern
-    if (payload.content) {
-      const match = payload.content.match(/(SSDEP[A-Z0-9]+|SSREN[A-Z0-9]+|PAY[A-Z0-9]+)/i);
-      if (match && match[1]) {
-        return match[1].toUpperCase();
-      }
+    // 2. Fallback to SePay pre-parsed code property if content regex did not match
+    if (payload.code && typeof payload.code === 'string' && payload.code.trim().length > 0) {
+      return payload.code.trim();
     }
 
     return null;

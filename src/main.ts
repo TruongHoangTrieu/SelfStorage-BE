@@ -9,8 +9,81 @@ async function bootstrap() {
   const logger = new Logger('Bootstrap');
   const app = await NestFactory.create(AppModule);
 
-  // Enable CORS
-  app.enableCors();
+  const configService = app.get(ConfigService);
+  const frontendUrl = configService.get<string>('FRONTEND_URL');
+  const allowedOrigins = [
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    frontendUrl,
+  ].filter(Boolean) as string[];
+
+  // Enable CORS strictly for trusted origins with credentials
+  app.enableCors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps, curl, or server-to-server)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error(`Origin ${origin} is not allowed by CORS policy`));
+    },
+    credentials: true,
+  });
+
+  // Hardened Anti-CSRF verification middleware
+  app.use((req: any, res: any, next: any) => {
+    const isStateChanging = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method?.toUpperCase());
+    if (!isStateChanging) {
+      return next();
+    }
+
+    // Exact path matching for public webhook exemption (prevent path injection bypass)
+    const normalizedPath = (req.path || '').split('?')[0];
+    const isPublicWebhook =
+      normalizedPath === '/api/payments/sepay/webhook' ||
+      normalizedPath === '/payments/sepay/webhook';
+    if (isPublicWebhook) {
+      return next();
+    }
+
+    // Requests carrying explicit Authorization: Bearer are explicit API clients (not browser CSRF vectors)
+    const authHeader = req.headers['authorization'];
+    if (authHeader && authHeader.toLowerCase().startsWith('bearer ')) {
+      return next();
+    }
+
+    // Check Origin / Referer against trusted origins whitelist
+    const origin = req.headers['origin'];
+    const referer = req.headers['referer'];
+    let requestOrigin: string | null = null;
+    try {
+      requestOrigin = origin || (referer ? new URL(referer).origin : null);
+    } catch {
+      requestOrigin = null;
+    }
+
+    if (requestOrigin) {
+      if (allowedOrigins.includes(requestOrigin)) {
+        return next();
+      }
+      return res.status(403).json({
+        statusCode: 403,
+        message: 'Forbidden: CSRF check failed (untrusted request origin)',
+      });
+    }
+
+    // If Origin/Referer is absent, verify custom anti-CSRF header (sent by legitimate fetch/XHR clients like api.ts)
+    const xRequestedWith = req.headers['x-requested-with'];
+    if (xRequestedWith && xRequestedWith.toLowerCase() === 'xmlhttprequest') {
+      return next();
+    }
+
+    // Reject missing Origin/Referer without anti-CSRF custom header to prevent stripped-header CSRF exploits
+    return res.status(403).json({
+      statusCode: 403,
+      message: 'Forbidden: CSRF check failed (missing Origin and anti-CSRF verification header)',
+    });
+  });
 
   // Set global prefix
   app.setGlobalPrefix('api');
@@ -65,7 +138,6 @@ async function bootstrap() {
     customSiteTitle: 'SelfStorage API Documentation',
   });
 
-  const configService = app.get(ConfigService);
   const port = configService.get<number>('PORT') || 5000;
 
   await app.listen(port);

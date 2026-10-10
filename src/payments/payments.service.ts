@@ -136,7 +136,7 @@ export class PaymentsService {
 
     // 7. Generate unique, clean payment code: SSDEP<reservationId><random4>
     const randomPart = Math.random().toString(36).substring(2, 6).toUpperCase();
-    const paymentCode = `SSDEP${reservation.id}${randomPart}`;
+    const paymentCode = `SSDEP${reservation.id}${randomPart}`.toUpperCase();
 
     // 8. Create Payment record in database
     const payment = await this.prisma.payment.create({
@@ -350,7 +350,7 @@ export class PaymentsService {
 
     // Generate unique code: SSREN<reservationId><random4>
     const randomPart = Math.random().toString(36).substring(2, 6).toUpperCase();
-    const paymentCode = `SSREN${reservation.id}${randomPart}`;
+    const paymentCode = `SSREN${reservation.id}${randomPart}`.toUpperCase();
 
     const payment = await this.prisma.payment.create({
       data: {
@@ -417,8 +417,8 @@ export class PaymentsService {
       };
     }
 
-    // 4. Find matching Payment in database
-    const payment = await this.prisma.payment.findUnique({
+    // 4. Find matching Payment in database (with case-insensitive fallback)
+    let payment = await this.prisma.payment.findUnique({
       where: { paymentCode },
       include: {
         reservation: {
@@ -431,11 +431,63 @@ export class PaymentsService {
     });
 
     if (!payment) {
+      payment = await this.prisma.payment.findFirst({
+        where: {
+          paymentCode: {
+            equals: paymentCode,
+            mode: 'insensitive',
+          },
+        },
+        include: {
+          reservation: {
+            include: {
+              items: true,
+            },
+          },
+          contract: true,
+        },
+      });
+    }
+
+    // Additional robust fallback for MongoDB case-sensitivity:
+    // If exact lookup failed, search recently created pending payments in-memory
+    if (!payment) {
+      const recentPendingPayments = await this.prisma.payment.findMany({
+        where: {
+          status: PaymentStatus.PENDING,
+        },
+        include: {
+          reservation: {
+            include: {
+              items: true,
+            },
+          },
+          contract: true,
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+        take: 50,
+      });
+
+      const matched = recentPendingPayments.find(
+        (p) => p.paymentCode.trim().toUpperCase() === paymentCode.trim().toUpperCase(),
+      );
+
+      if (matched) {
+        payment = matched;
+        this.logger.log(
+          `Case-insensitive matched payment: "${paymentCode}" -> DB: "${payment.paymentCode}"`,
+        );
+      }
+    }
+
+    if (!payment) {
       this.logger.warn(
         `Payment record with code "${paymentCode}" not found in database.`,
       );
       return {
-        success: true,
+        success: false,
         message: `Payment code ${paymentCode} not found in system`,
       };
     }

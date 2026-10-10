@@ -7,7 +7,9 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  Res,
 } from '@nestjs/common';
+import { Response } from 'express';
 import {
   ApiTags,
   ApiOperation,
@@ -25,27 +27,113 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { UserRole } from '../common/enums/role.enum';
 
+import { ConfigService } from '@nestjs/config';
+
 @ApiTags('Authentication & IAM')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly configService: ConfigService,
+  ) {}
+
+  private getCookieMaxAge(): number {
+    const exp = (this.configService.get<string>('JWT_EXPIRES_IN') || '1d').trim();
+    const match = exp.match(/^(\d+)([dhms]?)$/i);
+    if (!match) return 24 * 60 * 60 * 1000;
+    const val = parseInt(match[1], 10);
+    const unit = match[2]?.toLowerCase();
+    switch (unit) {
+      case 'd':
+        return val * 24 * 60 * 60 * 1000;
+      case 'h':
+        return val * 60 * 60 * 1000;
+      case 'm':
+        return val * 60 * 1000;
+      case 's':
+        return val * 1000;
+      default:
+        return val * 1000;
+    }
+  }
+
+  private getCookieOptions(): {
+    httpOnly: boolean;
+    secure: boolean;
+    sameSite: 'lax' | 'strict' | 'none';
+    maxAge: number;
+    path: string;
+    domain?: string;
+  } {
+    const maxAge = this.getCookieMaxAge();
+    const cookieDomain = this.configService.get<string>('COOKIE_DOMAIN');
+    const configuredSameSite = this.configService.get<string>('COOKIE_SAMESITE')?.toLowerCase();
+    const isProd = process.env.NODE_ENV === 'production';
+
+    let sameSite: 'lax' | 'strict' | 'none' = 'lax';
+    if (configuredSameSite === 'none' && isProd) {
+      sameSite = 'none';
+    } else if (configuredSameSite === 'strict') {
+      sameSite = 'strict';
+    }
+
+    return {
+      httpOnly: true,
+      secure: isProd || sameSite === 'none',
+      sameSite,
+      maxAge,
+      path: '/',
+      ...(cookieDomain ? { domain: cookieDomain } : {}),
+    };
+  }
+
+  private setAuthCookie(response: Response, token: string) {
+    const options = this.getCookieOptions();
+    response.cookie('token', token, options);
+  }
+
+  private clearAuthCookie(response: Response) {
+    const options = this.getCookieOptions();
+    response.clearCookie('token', {
+      ...options,
+      maxAge: 0,
+    });
+  }
 
   @ApiOperation({ summary: 'Đăng ký tài khoản khách hàng mới' })
-  @ApiResponse({ status: 201, description: 'Đăng ký thành công' })
+  @ApiResponse({ status: 201, description: 'Đăng ký thành công, nhận cookie xác thực' })
   @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ hoặc email đã tồn tại' })
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
-  async register(@Body() registerDto: RegisterDto) {
-    return this.authService.register(registerDto);
+  async register(
+    @Body() registerDto: RegisterDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const result = await this.authService.register(registerDto);
+    if (result.accessToken) {
+      this.setAuthCookie(response, result.accessToken);
+    }
+    return {
+      message: result.message,
+      user: result.user,
+    };
   }
 
-  @ApiOperation({ summary: 'Đăng nhập hệ thống (nhận JWT Bearer Token)' })
-  @ApiResponse({ status: 200, description: 'Đăng nhập thành công, trả về access token và thông tin user' })
+  @ApiOperation({ summary: 'Đăng nhập hệ thống (nhận HttpOnly Cookie)' })
+  @ApiResponse({ status: 200, description: 'Đăng nhập thành công, nhận cookie và thông tin user' })
   @ApiResponse({ status: 401, description: 'Email hoặc mật khẩu không chính xác' })
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  async login(@Body() loginDto: LoginDto) {
-    return this.authService.login(loginDto);
+  async login(
+    @Body() loginDto: LoginDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const result = await this.authService.login(loginDto);
+    this.setAuthCookie(response, result.accessToken);
+    return {
+      message: 'Đăng nhập thành công',
+      user: result.user,
+    };
   }
 
   @ApiBearerAuth('JWT-auth')
@@ -91,7 +179,11 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Post('logout')
   @HttpCode(HttpStatus.OK)
-  async logout(@CurrentUser() user: any) {
+  async logout(
+    @CurrentUser() user: any,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    this.clearAuthCookie(response);
     return this.authService.logout(user.id);
   }
 

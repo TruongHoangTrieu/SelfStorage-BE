@@ -49,11 +49,21 @@ export class AuthService {
       status: UserStatus.ACTIVE,
     });
 
-    this.logger.log(`New customer registered: ${newUser.email}`);
+    const sanitizedUser = this.usersService.sanitizeUser(newUser);
+
+    const payload: JwtPayload = {
+      sub: newUser.id,
+      email: newUser.email,
+      role: customerRole.name,
+      facilityId: null,
+    };
+
+    const accessToken = this.jwtService.sign(payload);
 
     return {
       message: 'Registration successful',
-      user: this.usersService.sanitizeUser(newUser),
+      accessToken,
+      user: sanitizedUser,
     };
   }
 
