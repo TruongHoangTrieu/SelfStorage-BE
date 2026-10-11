@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { DatabaseModule } from './database/database.module';
@@ -14,6 +15,7 @@ import { OperationsModule } from './operations/operations.module';
 import { ContractsModule } from './contracts/contracts.module';
 import { SupportModule } from './support/support.module';
 import { PaymentsModule } from './payments/payments.module';
+import { RenewalsModule } from './renewals/renewals.module';
 
 @Module({
   imports: [
@@ -21,6 +23,7 @@ import { PaymentsModule } from './payments/payments.module';
       isGlobal: true,
       envFilePath: '.env',
     }),
+    ScheduleModule.forRoot(),
     DatabaseModule,
     UsersModule,
     AuthModule,
@@ -33,6 +36,7 @@ import { PaymentsModule } from './payments/payments.module';
     ContractsModule,
     SupportModule,
     PaymentsModule,
+    RenewalsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
