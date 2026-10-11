@@ -4,10 +4,12 @@ import {
   Get,
   Put,
   Body,
+  Query,
   UseGuards,
   HttpCode,
   HttpStatus,
   Res,
+  BadRequestException,
 } from '@nestjs/common';
 import { Response } from 'express';
 import {
@@ -19,6 +21,7 @@ import {
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { GoogleLoginDto } from './dto/google-login.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -134,6 +137,107 @@ export class AuthController {
       message: 'Đăng nhập thành công',
       user: result.user,
     };
+  }
+
+  @ApiOperation({ summary: 'Đăng nhập bằng tài khoản Google (Token / Credential / Code)' })
+  @ApiResponse({ status: 200, description: 'Đăng nhập Google thành công, nhận cookie và thông tin user' })
+  @ApiResponse({ status: 400, description: 'Thiếu credential hoặc mã code từ Google' })
+  @ApiResponse({ status: 401, description: 'Xác thực Google thất bại' })
+  @Post('google')
+  @HttpCode(HttpStatus.OK)
+  async googleLogin(
+    @Body() googleLoginDto: GoogleLoginDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const token = googleLoginDto.credential || googleLoginDto.idToken;
+    let profile: {
+      email: string;
+      fullName: string;
+      avatarUrl?: string;
+      googleId: string;
+    };
+
+    if (token) {
+      profile = await this.authService.verifyGoogleIdToken(token);
+    } else if (googleLoginDto.code) {
+      profile = await this.authService.exchangeGoogleCode(googleLoginDto.code);
+    } else {
+      throw new BadRequestException(
+        'Vui lòng cung cấp credential/idToken hoặc authorization code từ Google',
+      );
+    }
+
+    const result = await this.authService.loginOrRegisterGoogleUser(profile);
+    this.setAuthCookie(response, result.accessToken);
+
+    return {
+      message: result.message,
+      user: result.user,
+      accessToken: result.accessToken,
+    };
+  }
+
+  @ApiOperation({ summary: 'Khởi chạy chuyển hướng đăng nhập Google OAuth 2.0' })
+  @ApiResponse({ status: 302, description: 'Chuyển hướng đến Google Consent Screen' })
+  @Get('google')
+  async googleAuth(@Res() response: Response) {
+    const frontendUrl =
+      this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
+    try {
+      const url = this.authService.getGoogleAuthUrl();
+      return response.redirect(url);
+    } catch (err: any) {
+      return response.redirect(
+        `${frontendUrl}/login?error=${encodeURIComponent(
+          err.message || 'Chưa thể khởi tạo Google OAuth. Vui lòng cấu hình GOOGLE_CLIENT_ID trong .env',
+        )}`,
+      );
+    }
+  }
+
+  @ApiOperation({ summary: 'Tiếp nhận chuyển hướng Callback từ Google OAuth 2.0' })
+  @ApiResponse({ status: 302, description: 'Xác thực thành công và chuyển hướng về Frontend' })
+  @Get('google/callback')
+  async googleAuthCallback(
+    @Query('code') code: string,
+    @Query('error') error: string,
+    @Res() response: Response,
+  ) {
+    const frontendUrl =
+      this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
+
+    if (error) {
+      return response.redirect(
+        `${frontendUrl}/auth/callback?error=${encodeURIComponent(
+          'Đăng nhập Google bị hủy: ' + error,
+        )}`,
+      );
+    }
+
+    if (!code) {
+      return response.redirect(
+        `${frontendUrl}/auth/callback?error=${encodeURIComponent(
+          'Không nhận được mã xác thực (code) từ Google',
+        )}`,
+      );
+    }
+
+    try {
+      const profile = await this.authService.exchangeGoogleCode(code);
+      const result = await this.authService.loginOrRegisterGoogleUser(profile);
+      this.setAuthCookie(response, result.accessToken);
+
+      const encodedUser = encodeURIComponent(JSON.stringify(result.user));
+      return response.redirect(
+        `${frontendUrl}/auth/callback?success=true&user=${encodedUser}`,
+      );
+    } catch (err: any) {
+      return response.redirect(
+        `${frontendUrl}/auth/callback?error=${encodeURIComponent(
+          err.message || 'Xác thực Google thất bại',
+        )}`,
+      );
+    }
   }
 
   @ApiBearerAuth('JWT-auth')
