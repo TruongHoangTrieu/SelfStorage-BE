@@ -203,8 +203,13 @@ export class AuthController {
     @Query('error') error: string,
     @Res() response: Response,
   ) {
-    const frontendUrl =
+    const rawFrontendUrl =
       this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3000';
+    // Clean any leading key names (e.g. FRONTEND_URL=), newlines, and trailing slashes
+    const frontendUrl = rawFrontendUrl
+      .replace(/^FRONTEND_URL\s*=\s*/i, '')
+      .trim()
+      .replace(/\/+$/, '');
 
     if (error) {
       return response.redirect(
