@@ -16,6 +16,7 @@ import {
   ContractItemStatus,
   HandoverType,
   AccessCodeStatus,
+  PaymentStatus,
   Prisma,
 } from '@prisma/client';
 import { UserRole } from '../common/enums/role.enum';
@@ -345,6 +346,18 @@ export class HandoversService {
         });
         handoverRecords.push(handoverRecord);
       }
+
+      // Update any pending payment records for this reservation to PAID
+      await tx.payment.updateMany({
+        where: {
+          reservationId: reservation.id,
+          status: PaymentStatus.PENDING,
+        },
+        data: {
+          status: PaymentStatus.PAID,
+          paidAt: new Date(),
+        },
+      });
 
       // Transition reservation status to COMPLETED
       const updatedReservation = await tx.reservation.update({
