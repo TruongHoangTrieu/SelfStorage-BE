@@ -451,6 +451,7 @@ model ContractItem {
   supportRequests SupportRequest[]
   storedItems     StoredItem[]
   unitAccessLogs  UnitAccessLog[]
+  guestAccessCodes GuestAccessCode[]
 
   @@index([contractId])
   @@index([unitId])
@@ -789,5 +790,25 @@ model UnitAccessLog {
   @@index([contractItemId])
   @@index([accessedAt])
   @@map("unit_access_logs")
+}
+
+model GuestAccessCode {
+  id             Int       @id @default(autoincrement()) @map("id")
+  contractItemId Int       @map("contract_item_id")
+  guestName      String    @map("guest_name")
+  pinCode        String    @map("pin_code")
+  validFrom      DateTime  @default(now()) @map("valid_from")
+  validTo        DateTime  @map("valid_to")
+  usageType      String    @default("multi_time") @map("usage_type")
+  status         String    @default("active") @map("status")
+  purpose        String?   @map("purpose")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  contractItem   ContractItem @relation(fields: [contractItemId], references: [id], onDelete: Cascade)
+
+  @@index([contractItemId])
+  @@index([status])
+  @@map("guest_access_codes")
 }
 

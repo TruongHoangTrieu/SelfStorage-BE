@@ -30,6 +30,8 @@ import {
   ResetSmartLockPinDto,
   UpdateSmartLockStatusDto,
 } from './dto/smart-lock.dto';
+import { RenewContractDto } from './dto/renew-contract.dto';
+import { CreateGuestCodeDto } from './dto/guest-code.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -260,5 +262,49 @@ export class ContractsController {
     @CurrentUser() user: any,
   ) {
     return this.contractsService.deleteStoredItem(itemId, user.id, user.role);
+  }
+
+  // ==================== MÃ KHÁCH TẠM THỜI (GUEST ACCESS CODES) ====================
+
+  @ApiOperation({ summary: 'Khách hàng tạo mã mở khóa tạm thời cho khách/người thân' })
+  @ApiParam({ name: 'contractId', description: 'ID hợp đồng', example: 1 })
+  @ApiParam({ name: 'unitId', description: 'ID ngăn kho', example: 1 })
+  @ApiResponse({ status: 201, description: 'Tạo mã khách thành công' })
+  @Post(':contractId/units/:unitId/guest-codes')
+  @HttpCode(HttpStatus.CREATED)
+  async createGuestCode(
+    @Param('contractId', ParseIntPipe) contractId: number,
+    @Param('unitId', ParseIntPipe) unitId: number,
+    @CurrentUser() user: any,
+    @Body() dto: CreateGuestCodeDto,
+  ) {
+    return this.contractsService.createGuestCode(contractId, unitId, user.id, dto);
+  }
+
+  @ApiOperation({ summary: 'Lấy danh sách mã mở khóa tạm thời của ngăn kho' })
+  @ApiParam({ name: 'contractId', description: 'ID hợp đồng', example: 1 })
+  @ApiParam({ name: 'unitId', description: 'ID ngăn kho', example: 1 })
+  @ApiResponse({ status: 200, description: 'Danh sách mã khách' })
+  @Get(':contractId/units/:unitId/guest-codes')
+  async getGuestCodes(
+    @Param('contractId', ParseIntPipe) contractId: number,
+    @Param('unitId', ParseIntPipe) unitId: number,
+    @CurrentUser() user: any,
+  ) {
+    return this.contractsService.getGuestCodes(contractId, unitId, user.id);
+  }
+
+  // ==================== GIA HẠN HỢP ĐỒNG (CONTRACT RENEWAL) ====================
+
+  @ApiOperation({ summary: 'Khách hàng tự gia hạn hợp đồng thuê kho' })
+  @ApiParam({ name: 'id', description: 'ID hợp đồng', example: 1 })
+  @ApiResponse({ status: 200, description: 'Gia hạn hợp đồng thành công' })
+  @Post(':id/renew')
+  async renewContract(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: any,
+    @Body() dto: RenewContractDto,
+  ) {
+    return this.contractsService.renewContract(id, user.id, dto);
   }
 }

@@ -18,8 +18,14 @@ import {
   ContractStatus,
   AccessCodeStatus,
   StorageUnitStatus,
+  RenewalStatus,
+  PaymentType,
+  PaymentStatus,
+  PaymentMethod,
 } from '@prisma/client';
 import { UserRole } from '../common/enums/role.enum';
+import { RenewContractDto } from './dto/renew-contract.dto';
+import { CreateGuestCodeDto } from './dto/guest-code.dto';
 
 @Injectable()
 export class ContractsService {
@@ -92,8 +98,11 @@ export class ContractsService {
               },
             },
             storedItems: true,
+            guestAccessCodes: { orderBy: { createdAt: 'desc' } },
           },
         },
+        payments: { orderBy: { createdAt: 'desc' } },
+        renewals: { orderBy: { createdAt: 'desc' } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -526,5 +535,152 @@ export class ContractsService {
     });
 
     return { message: 'Đã xóa món đồ khỏi danh mục lưu trữ thành công' };
+  }
+
+  // ==================== MÃ KHÁCH TẠM THỜI (GUEST ACCESS CODES) ====================
+
+  async createGuestCode(
+    contractId: number,
+    unitId: number,
+    userId: number,
+    dto: CreateGuestCodeDto,
+  ) {
+    const contract = await this.prisma.rentalContract.findUnique({
+      where: { id: contractId },
+      include: { contractItems: true },
+    });
+
+    if (!contract || contract.customerId !== userId) {
+      throw new ForbiddenException('Bạn không có quyền quản lý ô kho này');
+    }
+
+    const item = contract.contractItems.find((ci) => ci.unitId === unitId);
+    if (!item) {
+      throw new NotFoundException('Không tìm thấy ngăn kho trong hợp đồng');
+    }
+
+    const now = new Date();
+    let validTo = new Date(now);
+    if (dto.durationOption === '2h') {
+      validTo.setHours(validTo.getHours() + 2);
+    } else if (dto.durationOption === '3d') {
+      validTo.setDate(validTo.getDate() + 3);
+    } else {
+      validTo.setHours(validTo.getHours() + 24);
+    }
+
+    return this.prisma.guestAccessCode.create({
+      data: {
+        contractItemId: item.id,
+        guestName: dto.guestName,
+        pinCode: dto.pinCode,
+        validFrom: now,
+        validTo,
+        usageType: dto.usageType || 'multi_time',
+        status: 'active',
+        purpose: dto.purpose || null,
+      },
+    });
+  }
+
+  async getGuestCodes(contractId: number, unitId: number, userId: number) {
+    const contract = await this.prisma.rentalContract.findUnique({
+      where: { id: contractId },
+      include: { contractItems: true },
+    });
+
+    if (!contract || contract.customerId !== userId) {
+      throw new ForbiddenException('Bạn không có quyền quản lý ô kho này');
+    }
+
+    const item = contract.contractItems.find((ci) => ci.unitId === unitId);
+    if (!item) {
+      throw new NotFoundException('Không tìm thấy ngăn kho trong hợp đồng');
+    }
+
+    return this.prisma.guestAccessCode.findMany({
+      where: { contractItemId: item.id },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  // ==================== GIA HẠN HỢP ĐỒNG (CONTRACT RENEWAL) ====================
+
+  async renewContract(contractId: number, userId: number, dto: RenewContractDto) {
+    const contract = await this.prisma.rentalContract.findUnique({
+      where: { id: contractId },
+      include: { contractItems: true },
+    });
+
+    if (!contract || contract.customerId !== userId) {
+      throw new ForbiddenException('Bạn không có quyền gia hạn hợp đồng này');
+    }
+
+    const months = dto.extendedMonths;
+    const oldEndDate = new Date(contract.endDate);
+    const newEndDate = new Date(oldEndDate);
+    newEndDate.setMonth(newEndDate.getMonth() + months);
+
+    let discountPercent = 0;
+    if (months >= 12) discountPercent = 15;
+    else if (months >= 6) discountPercent = 10;
+    else if (months >= 3) discountPercent = 5;
+
+    const monthlyTotal = contract.contractItems.reduce(
+      (sum, ci) => sum + Number(ci.rentalPrice),
+      0,
+    );
+    const grossAmount = monthlyTotal * months;
+    const discountAmount = Math.round((grossAmount * discountPercent) / 100);
+    const netAmount = grossAmount - discountAmount;
+
+    const paymentCode = `PAY-${contract.contractCode.slice(-6)}-REN${months}M`;
+
+    return this.prisma.$transaction(async (tx) => {
+      // 1. Cập nhật ngày kết thúc hợp đồng
+      const updatedContract = await tx.rentalContract.update({
+        where: { id: contractId },
+        data: {
+          endDate: newEndDate,
+          status: ContractStatus.ACTIVE,
+        },
+      });
+
+      // 2. Tạo bản ghi ContractRenewal
+      const renewalRecord = await tx.contractRenewal.create({
+        data: {
+          contractId,
+          oldEndDate,
+          newEndDate,
+          renewalFee: netAmount,
+          requestedBy: userId,
+          approvedBy: userId,
+          status: RenewalStatus.COMPLETED,
+        },
+      });
+
+      // 3. Tạo bản ghi Payment
+      const paymentRecord = await tx.payment.create({
+        data: {
+          contractId,
+          paymentCode,
+          amount: netAmount,
+          paymentType: PaymentType.RENTAL,
+          paymentMethod: PaymentMethod.BANK_TRANSFER,
+          status: PaymentStatus.PAID,
+          paidAt: new Date(),
+          transactionReference: `Gia hạn hợp đồng ${contract.contractCode} thêm ${months} tháng (Chiết khấu ${discountPercent}%)`,
+        },
+      });
+
+      return {
+        success: true,
+        message: `Gia hạn hợp đồng thành công thêm ${months} tháng`,
+        newEndDate: newEndDate.toISOString(),
+        renewalRecord,
+        paymentRecord,
+        contract: updatedContract,
+      };
+    });
   }
 }
