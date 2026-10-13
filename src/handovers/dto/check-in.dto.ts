@@ -24,4 +24,8 @@ export class CheckInDto {
   @IsOptional()
   @IsArray({ message: 'photos must be an array of photo URLs or objects' })
   photos?: any[];
+
+  @IsOptional()
+  @IsString({ message: 'unitCode must be a string' })
+  unitCode?: string;
 }

@@ -445,6 +445,11 @@ export class ReservationsService {
               phone: true,
             },
           },
+          rentalContract: {
+            include: {
+              contractItems: true,
+            },
+          },
         },
       }),
     ]);

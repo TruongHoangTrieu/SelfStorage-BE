@@ -226,6 +226,42 @@ export class HandoversService {
       }
     }
 
+    // 2.1 Reassign unit if staff selected a different unit code
+    if (dto.unitCode && reservation.items[0]?.unit?.unitNumber !== dto.unitCode) {
+      const newUnit = await this.prisma.storageUnit.findFirst({
+        where: {
+          facilityId: reservation.facilityId,
+          unitNumber: dto.unitCode,
+        },
+      });
+
+      if (!newUnit) {
+        throw new NotFoundException(`Storage unit '${dto.unitCode}' not found at this facility`);
+      }
+
+      if (newUnit.status !== StorageUnitStatus.AVAILABLE && newUnit.status !== StorageUnitStatus.RESERVED) {
+        throw new ConflictException(`Storage unit '${dto.unitCode}' is not available (status: ${newUnit.status})`);
+      }
+
+      const oldUnitId = reservation.items[0].unitId;
+      if (oldUnitId && oldUnitId !== newUnit.id) {
+        await this.prisma.storageUnit.update({
+          where: { id: oldUnitId },
+          data: { status: StorageUnitStatus.AVAILABLE },
+        });
+        await this.prisma.storageUnit.update({
+          where: { id: newUnit.id },
+          data: { status: StorageUnitStatus.RESERVED },
+        });
+        await this.prisma.reservationItem.update({
+          where: { id: reservation.items[0].id },
+          data: { unitId: newUnit.id },
+        });
+        reservation.items[0].unitId = newUnit.id;
+        reservation.items[0].unit = newUnit;
+      }
+    }
+
     // 3. Verify Staff Facility Scope
     const userRole = typeof user.role === 'string' ? user.role : user.role?.name;
     await this.verifyStaffFacilityScope(
