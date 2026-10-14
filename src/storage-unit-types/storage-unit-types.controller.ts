@@ -10,6 +10,7 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  ForbiddenException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -26,6 +27,7 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Public } from '../common/decorators/public.decorator';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { UserRole } from '../common/enums/role.enum';
 
 @ApiTags('Storage Unit Types')
@@ -65,7 +67,19 @@ export class StorageUnitTypesController {
   )
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  async create(@Body() createDto: CreateStorageUnitTypeDto) {
+  async create(
+    @Body() createDto: CreateStorageUnitTypeDto,
+    @CurrentUser() user: any,
+  ) {
+    if (
+      user.role === UserRole.FACILITY_MANAGER &&
+      user.facilityId &&
+      String(createDto.facilityId) !== String(user.facilityId)
+    ) {
+      throw new ForbiddenException(
+        'Bạn chỉ có quyền tạo loại ngăn kho cho cơ sở được phân công quản lý',
+      );
+    }
     return this.storageUnitTypesService.create(createDto);
   }
 
@@ -83,7 +97,16 @@ export class StorageUnitTypesController {
   async update(
     @Param('id') id: string,
     @Body() updateDto: UpdateStorageUnitTypeDto,
+    @CurrentUser() user: any,
   ) {
+    if (user.role === UserRole.FACILITY_MANAGER && user.facilityId) {
+      const existing = await this.storageUnitTypesService.findById(id);
+      if (existing && String(existing.facilityId) !== String(user.facilityId)) {
+        throw new ForbiddenException(
+          'Bạn chỉ có quyền chỉnh sửa loại kho thuộc cơ sở được phân công quản lý',
+        );
+      }
+    }
     return this.storageUnitTypesService.update(id, updateDto);
   }
 
@@ -99,7 +122,15 @@ export class StorageUnitTypesController {
     UserRole.SYSTEM_ADMINISTRATOR,
   )
   @Delete(':id')
-  async delete(@Param('id') id: string) {
+  async delete(@Param('id') id: string, @CurrentUser() user: any) {
+    if (user.role === UserRole.FACILITY_MANAGER && user.facilityId) {
+      const existing = await this.storageUnitTypesService.findById(id);
+      if (existing && String(existing.facilityId) !== String(user.facilityId)) {
+        throw new ForbiddenException(
+          'Bạn chỉ có quyền xóa loại kho thuộc cơ sở được phân công quản lý',
+        );
+      }
+    }
     return this.storageUnitTypesService.delete(id);
   }
 }
