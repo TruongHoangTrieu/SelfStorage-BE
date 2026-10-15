@@ -177,6 +177,18 @@ export class ReservationsService {
       throw new BadRequestException('appointmentDate cannot be in the past');
     }
 
+    // Quy tắc: Lịch hẹn nhận kho chỉ được đặt trước tối đa 7 ngày (1 tuần)
+    const maxAdvanceDays = 7;
+    const maxAllowedDate = new Date();
+    maxAllowedDate.setDate(maxAllowedDate.getDate() + maxAdvanceDays);
+    maxAllowedDate.setHours(23, 59, 59, 999);
+
+    if (appointmentDate > maxAllowedDate) {
+      throw new BadRequestException(
+        `Lịch hẹn nhận kho chỉ được đặt trước tối đa ${maxAdvanceDays} ngày (1 tuần) để đảm bảo tối ưu vận hành`,
+      );
+    }
+
     // 5. Calculate pricing
     const now = new Date();
     let pricingRule = await this.prisma.pricingRule.findFirst({
