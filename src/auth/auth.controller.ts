@@ -118,6 +118,7 @@ export class AuthController {
     }
     return {
       message: result.message,
+      accessToken: result.accessToken,
       user: result.user,
     };
   }
@@ -135,6 +136,7 @@ export class AuthController {
     this.setAuthCookie(response, result.accessToken);
     return {
       message: 'Đăng nhập thành công',
+      accessToken: result.accessToken,
       user: result.user,
     };
   }
