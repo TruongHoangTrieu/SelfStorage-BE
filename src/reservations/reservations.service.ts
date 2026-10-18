@@ -6,6 +6,7 @@ import {
   ForbiddenException,
   Logger,
 } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../database/prisma.service';
 import { CreateReservationDto } from './dto/create-reservation.dto';
 import { UpdateReservationDto } from './dto/update-reservation.dto';
@@ -410,6 +411,13 @@ export class ReservationsService {
       ];
     }
 
+    // Quét và tự động giải phóng các đơn PENDING quá 15 phút để đảm bảo danh sách luôn đồng bộ
+    try {
+      await this.expireStalePendingReservations();
+    } catch (e: any) {
+      this.logger.warn(`Failed to auto-expire stale reservations during findMany: ${e?.message}`);
+    }
+
     const [total, data] = await Promise.all([
       this.prisma.reservation.count({ where }),
       this.prisma.reservation.findMany({
@@ -539,6 +547,16 @@ export class ReservationsService {
       reservation.facilityId !== user.facilityId
     ) {
       throw new ForbiddenException('Bạn chỉ có quyền xem đơn đặt chỗ thuộc cơ sở được phân công');
+    }
+
+    // Tự động kiểm tra hết hạn 15 phút nếu đơn vẫn ở trạng thái PENDING
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+    if (
+      reservation.status === ReservationStatus.PENDING &&
+      reservation.createdAt <= fifteenMinutesAgo
+    ) {
+      await this.expireSingleReservation(reservation.id, reservation);
+      reservation.status = ReservationStatus.EXPIRED;
     }
 
     return reservation;
@@ -766,6 +784,105 @@ export class ReservationsService {
       });
 
       return updatedReservation;
+    });
+  }
+
+  /**
+   * Tự động quét và hủy các đơn PENDING quá 15 phút chưa hoàn tất cọc
+   * Chạy định kỳ mỗi phút một lần
+   */
+  @Cron(CronExpression.EVERY_MINUTE)
+  async handleExpirePendingReservationsCron() {
+    await this.expireStalePendingReservations();
+  }
+
+  /**
+   * Quét và hủy toàn bộ các đơn đặt chỗ PENDING quá 15 phút
+   */
+  async expireStalePendingReservations() {
+    const expirationMinutes = 15;
+    const threshold = new Date(Date.now() - expirationMinutes * 60 * 1000);
+
+    const staleReservations = await this.prisma.reservation.findMany({
+      where: {
+        status: ReservationStatus.PENDING,
+        createdAt: {
+          lte: threshold,
+        },
+      },
+      include: {
+        items: true,
+      },
+    });
+
+    if (staleReservations.length === 0) {
+      return { count: 0 };
+    }
+
+    this.logger.log(
+      `[CRON] Phát hiện ${staleReservations.length} đơn đặt chỗ PENDING quá 15 phút chưa nộp cọc. Đang tự động hủy và giải phóng kho...`,
+    );
+
+    let expiredCount = 0;
+    for (const r of staleReservations) {
+      try {
+        await this.expireSingleReservation(r.id, r);
+        expiredCount++;
+      } catch (err: any) {
+        this.logger.error(
+          `Lỗi khi tự động hủy đơn ${r.id}: ${err?.message}`,
+          err?.stack,
+        );
+      }
+    }
+
+    return { count: expiredCount };
+  }
+
+  /**
+   * Hủy một đơn đặt chỗ cụ thể do quá hạn 15 phút và giải phóng ô kho về AVAILABLE
+   */
+  async expireSingleReservation(id: string, cachedReservation?: any) {
+    const reservation =
+      cachedReservation ||
+      (await this.prisma.reservation.findUnique({
+        where: { id },
+        include: { items: true },
+      }));
+
+    if (!reservation || reservation.status !== ReservationStatus.PENDING) {
+      return reservation;
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      // 1. Trả các ô kho đã giữ về AVAILABLE
+      for (const item of reservation.items) {
+        if (item.unitId) {
+          await tx.storageUnit.updateMany({
+            where: {
+              id: item.unitId,
+              status: StorageUnitStatus.RESERVED,
+            },
+            data: {
+              status: StorageUnitStatus.AVAILABLE,
+            },
+          });
+        }
+      }
+
+      // 2. Cập nhật trạng thái đơn thành EXPIRED
+      const updated = await tx.reservation.update({
+        where: { id: reservation.id },
+        data: {
+          status: ReservationStatus.EXPIRED,
+        },
+      });
+
+      this.logger.log(
+        `Đơn ${reservation.reservationCode || reservation.id} đã tự động hủy (EXPIRED) do quá 15 phút không thanh toán cọc. Ô kho đã được giải phóng.`,
+      );
+
+      return updated;
     });
   }
 }

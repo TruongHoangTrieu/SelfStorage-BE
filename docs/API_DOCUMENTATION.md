@@ -33,7 +33,8 @@ Tài liệu này ghi lại danh sách tất cả các API đã phát triển tro
 | `2` | `FACILITY_MANAGER`            | Facility Manager            | `manager@selfstorage.vn`      | `123456`          | Facility 1 (Trụ sở Võ Nguyên Giáp)        | Quản Lý Chi Nhánh Thủ Đức   | `0901234567`  |
 | `3` | `FACILITY_STAFF`              | Facility Staff              | `staff@selfstorage.vn`        | `123456`          | Facility 1 (Trụ sở Võ Nguyên Giáp)        | Nguyễn Văn Staff            | `0907654321`  |
 | `7` | `FACILITY_STAFF`              | Facility Staff              | `staff.thuduc@selfstorage.vn` | `123456`          | Facility 1 (Trụ sở Võ Nguyên Giáp)        | Trần Văn Thủ Đức            | `0907654322`  |
-| `13`| `FACILITY_STAFF`              | Facility Staff              | `staff.anphu@selfstorage.vn`  | `123456`          | Facility 2 (Chi Nhánh An Phú - Thủ Đức)   | Ngô Tấn Tài                 | `0903999000`  |
+| `13`| `FACILITY_STAFF`              | Facility Staff              | `staff.anphu@selfstorage.vn`  | `123456`          | Facility 2 (Chi Nhánh An Phú - Thủ Đức)   | Ngô Tấn Tài (Lễ Tân An Phú) | `0903999000`  |
+| `14`| `FACILITY_MANAGER`            | Facility Manager            | `manager.anphu@selfstorage.vn`| `123456`          | Facility 2 (Chi Nhánh An Phú - Thủ Đức)   | Trương Hoàng Triệu (QL An Phú)| `0903888000` |
 | `9` | `FACILITY_STAFF`              | Facility Staff              | `staff.quan1@selfstorage.vn`  | `123456`          | Facility 3 (Chi Nhánh Quận 1)             | Lê Hoàng Nam                | `0903111222`  |
 | `10`| `FACILITY_STAFF`              | Facility Staff              | `staff.quan7@selfstorage.vn`  | `123456`          | Facility 4 (Chi Nhánh Quận 7)             | Đặng Quốc Bảo               | `0903333444`  |
 | `11`| `FACILITY_STAFF`              | Facility Staff              | `staff.binhthanh@selfstorage.vn`| `123456`        | Facility 5 (Chi Nhánh Landmark 81)        | Vũ Minh Anh                 | `0903555666`  |

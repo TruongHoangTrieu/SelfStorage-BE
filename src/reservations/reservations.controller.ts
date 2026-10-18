@@ -105,4 +105,13 @@ export class ReservationsController {
   ) {
     return this.reservationsService.cancel(id, user, cancelReservationDto);
   }
+
+  @ApiOperation({ summary: 'Xác nhận hết hạn đơn đặt chỗ sau 15 phút không thanh toán cọc và giải phóng ô kho' })
+  @ApiParam({ name: 'id', description: 'ID đơn đặt chỗ' })
+  @ApiResponse({ status: 200, description: 'Đã giải phóng ô kho thành công' })
+  @Post(':id/expire')
+  @HttpCode(HttpStatus.OK)
+  async expire(@Param('id') id: string) {
+    return this.reservationsService.expireSingleReservation(id);
+  }
 }

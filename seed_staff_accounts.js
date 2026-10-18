@@ -86,6 +86,14 @@ async function main() {
       roleId: staffRole.id,
       position: 'Nhân viên vận hành kho',
     },
+    {
+      email: 'manager.anphu@selfstorage.vn',
+      fullName: 'Trương Hoàng Triệu (Quản Lý An Phú)',
+      phone: '0903888000',
+      facilityIndex: 1, // An Phú
+      roleId: managerRole.id,
+      position: 'Quản lý cơ sở kho An Phú',
+    },
   ];
 
   for (const item of staffConfigs) {

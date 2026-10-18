@@ -18,6 +18,7 @@ import {
   PaymentType,
   PaymentMethod,
   ReservationStatus,
+  StorageUnitStatus,
   Prisma,
 } from '@prisma/client';
 import { UserRole } from '../common/enums/role.enum';
@@ -209,6 +210,31 @@ export class PaymentsService {
       throw new ForbiddenException(
         'You do not have permission to view payment summary for this reservation',
       );
+    }
+
+    // Tự động kiểm tra hết hạn 15 phút nếu đơn vẫn là PENDING
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+    if (
+      reservation.status === ReservationStatus.PENDING &&
+      reservation.createdAt <= fifteenMinutesAgo
+    ) {
+      await this.prisma.$transaction(async (tx) => {
+        for (const item of reservation.items) {
+          if (item.unitId) {
+            await tx.storageUnit.updateMany({
+              where: { id: item.unitId, status: StorageUnitStatus.RESERVED },
+              data: { status: StorageUnitStatus.AVAILABLE },
+            });
+          }
+        }
+        await tx.reservation.update({
+          where: { id: reservation.id },
+          data: {
+            status: ReservationStatus.EXPIRED,
+          },
+        });
+      });
+      reservation.status = ReservationStatus.EXPIRED;
     }
 
     // Calculate total deposit and rental amounts from items
