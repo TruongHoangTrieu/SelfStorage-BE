@@ -7,7 +7,11 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiTags,
   ApiOperation,
@@ -16,6 +20,7 @@ import {
   ApiParam,
 } from '@nestjs/swagger';
 import { HandoversService } from './handovers.service';
+import { CloudinaryService } from '../common/cloudinary/cloudinary.service';
 import { CheckInDto } from './dto/check-in.dto';
 import { LogCccdAccessDto } from './dto/log-cccd-access.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -29,7 +34,10 @@ import { UserRole } from '../common/enums/role.enum';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('handovers')
 export class HandoversController {
-  constructor(private readonly handoversService: HandoversService) {}
+  constructor(
+    private readonly handoversService: HandoversService,
+    private readonly cloudinaryService: CloudinaryService,
+  ) {}
 
   @ApiOperation({ summary: 'Tra cứu thông tin đơn đặt chỗ để nhân viên chuẩn bị Check-in / Bàn giao kho' })
   @ApiParam({ name: 'reservationId', description: 'ID đơn đặt chỗ' })
@@ -83,4 +91,23 @@ export class HandoversController {
   ) {
     return this.handoversService.logCccdAccess(dto, user);
   }
+
+  @ApiOperation({ summary: 'Tải ảnh hiện trạng bàn giao lên Cloudinary' })
+  @ApiResponse({ status: 200, description: 'Tải ảnh thành công, trả về URL Cloudinary' })
+  @Roles(
+    UserRole.FACILITY_STAFF,
+    UserRole.FACILITY_MANAGER,
+    UserRole.BUSINESS_OPERATIONS_MANAGER,
+    UserRole.SYSTEM_ADMINISTRATOR,
+  )
+  @Post('upload-photo')
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(FileInterceptor('photo'))
+  async uploadPhoto(@UploadedFile() file: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('Vui lòng chọn tệp ảnh để tải lên');
+    }
+    return this.cloudinaryService.uploadImage(file, 'handovers');
+  }
 }
+

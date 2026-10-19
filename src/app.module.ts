@@ -16,6 +16,7 @@ import { ContractsModule } from './contracts/contracts.module';
 import { SupportModule } from './support/support.module';
 import { PaymentsModule } from './payments/payments.module';
 import { RenewalsModule } from './renewals/renewals.module';
+import { CloudinaryModule } from './common/cloudinary/cloudinary.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { RenewalsModule } from './renewals/renewals.module';
     }),
     ScheduleModule.forRoot(),
     DatabaseModule,
+    CloudinaryModule,
     UsersModule,
     AuthModule,
     FacilitiesModule,
