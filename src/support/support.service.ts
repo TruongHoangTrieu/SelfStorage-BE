@@ -114,12 +114,12 @@ export class SupportService {
     this.notificationsService
       .notifyFacilityStaff(
         dto.facilityId,
-        `Yêu cầu hỗ trợ mới [${created.priority}]`,
-        `[${created.category}] ${created.subject}`,
+        `Yêu cầu hỗ trợ mới: ${created.subject}`,
+        created.description || created.subject,
         NotificationType.SUPPORT,
         'SUPPORT_REQUEST',
         created.id,
-        { requestCode: created.requestCode, priority: created.priority },
+        { requestCode: created.requestCode, priority: created.priority, category: created.category },
       )
       .catch((err) =>
         this.logger.error(`Failed to notify staff of new support ticket: ${err.message}`),

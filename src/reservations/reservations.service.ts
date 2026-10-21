@@ -19,14 +19,19 @@ import {
   StorageUnitStatus,
   FacilityStatus,
   Prisma,
+  NotificationType,
 } from '@prisma/client';
 import { UserRole } from '../common/enums/role.enum';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class ReservationsService {
   private readonly logger = new Logger(ReservationsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   /**
    * Check storage unit availability for a given facility and unit type
@@ -243,7 +248,7 @@ export class ReservationsService {
     const totalAmount = netRental + depositAmount;
 
     // 6. Execute atomic transaction to hold unit and create reservation
-    return this.prisma.$transaction(async (tx) => {
+    const createdReservation = await this.prisma.$transaction(async (tx) => {
       // Find an available storage unit
       const availableUnit = await tx.storageUnit.findFirst({
         where: {
@@ -348,6 +353,22 @@ export class ReservationsService {
 
       return reservation;
     });
+
+    // Notify facility staff in real time and trigger checkin_queue_updated
+    this.notificationsService
+      .notifyFacilityStaff(
+        dto.facilityId,
+        'Có đơn đặt chỗ mới',
+        `Đơn đặt kho #${createdReservation.reservationCode} vừa được tạo tại cơ sở.`,
+        NotificationType.RESERVATION,
+        'RESERVATION',
+        createdReservation.id,
+      )
+      .catch((err) =>
+        this.logger.error(`Failed to notify staff of new reservation: ${err.message}`),
+      );
+
+    return createdReservation;
   }
 
   /**

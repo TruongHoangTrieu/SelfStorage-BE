@@ -8,7 +8,6 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { CheckInDto } from './dto/check-in.dto';
-import { LogCccdAccessDto } from './dto/log-cccd-access.dto';
 import {
   ReservationStatus,
   ReservationRentalPeriodUnit,
@@ -21,7 +20,6 @@ import {
   Prisma,
 } from '@prisma/client';
 import { UserRole } from '../common/enums/role.enum';
-import { decryptCccd, maskCccd } from '../common/utils/crypto.util';
 
 @Injectable()
 export class HandoversService {
@@ -158,21 +156,21 @@ export class HandoversService {
       reservation.facility.name,
     );
 
-    // Layer 3: Audit Logging for sensitive customer personal data access
+    // Audit Logging for customer handover profile access
     try {
       if (user?.id) {
         await this.prisma.activityLog.create({
           data: {
             userId: user.id,
-            action: 'VIEW_CUSTOMER_CCCD',
+            action: 'VIEW_CUSTOMER_HANDOVER_PROFILE',
             entityType: 'RESERVATION',
             entityId: reservation.id,
-            description: `Nhân viên đã truy cập hồ sơ kiểm tra CCCD cho đơn #${reservation.reservationCode || reservation.id}`,
+            description: `Nhân viên đã truy cập hồ sơ bàn giao cho đơn #${reservation.reservationCode || reservation.id}`,
           },
         });
       }
     } catch (logErr: any) {
-      this.logger.warn(`Could not record ActivityLog for CCCD access: ${logErr.message}`);
+      this.logger.warn(`Could not record ActivityLog for handover profile access: ${logErr.message}`);
     }
 
     return reservation;
@@ -443,47 +441,5 @@ export class HandoversService {
       };
     });
   }
-
-  /**
-   * Ghi nhận Audit Log khi nhân viên mở xem hoặc in thông tin CCCD
-   */
-  async logCccdAccess(dto: LogCccdAccessDto, user: any) {
-    let staffUserId = user?.id || user?.sub;
-    if (!staffUserId) {
-      const defaultStaff = await this.prisma.user.findFirst({
-        where: { status: 'ACTIVE' },
-        select: { id: true, fullName: true, email: true },
-      });
-      staffUserId = defaultStaff?.id;
-    }
-
-    if (!staffUserId) {
-      this.logger.warn('No staff user found to record ActivityLog');
-      return { success: false, message: 'No staff user found' };
-    }
-
-    const isPrint = dto.action === 'PRINT_CONTRACT_WITH_CCCD';
-    const actionText = isPrint
-      ? `Nhân viên đã xuất in Hợp đồng chứa đầy đủ số CCCD cho đơn #${dto.reservationId} (Khách: ${dto.customerName || 'N/A'})`
-      : `Nhân viên đã bấm mở xem toàn bộ số CCCD cho đơn #${dto.reservationId} (Khách: ${dto.customerName || 'N/A'})`;
-
-    const log = await this.prisma.activityLog.create({
-      data: {
-        userId: staffUserId,
-        action: dto.action,
-        entityType: 'RESERVATION',
-        entityId: dto.reservationId,
-        description: actionText,
-      },
-    });
-
-    this.logger.log(`AuditLog created [${log.id}] - ${actionText}`);
-
-    return {
-      success: true,
-      logId: log.id,
-      action: log.action,
-      createdAt: log.createdAt,
-    };
-  }
 }
+

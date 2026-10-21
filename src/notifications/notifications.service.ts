@@ -62,6 +62,23 @@ export class NotificationsService {
       createdAt: new Date(),
     });
 
+    // Notify staff check-in queue in real time
+    this.gateway.sendToFacility(facilityId, 'checkin_queue_updated', {
+      facilityId,
+      title,
+      type,
+      entityId,
+      createdAt: new Date(),
+    });
+
+    this.gateway.broadcast('checkin_queue_updated', {
+      facilityId,
+      title,
+      type,
+      entityId,
+      createdAt: new Date(),
+    });
+
     // Find assigned staff members for persistent in-app notifications
     const assignments = await this.prisma.staffFacilityAssignment.findMany({
       where: {
