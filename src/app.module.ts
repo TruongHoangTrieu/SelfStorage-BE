@@ -17,6 +17,7 @@ import { SupportModule } from './support/support.module';
 import { PaymentsModule } from './payments/payments.module';
 import { RenewalsModule } from './renewals/renewals.module';
 import { CloudinaryModule } from './common/cloudinary/cloudinary.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { CloudinaryModule } from './common/cloudinary/cloudinary.module';
     ScheduleModule.forRoot(),
     DatabaseModule,
     CloudinaryModule,
+    NotificationsModule,
     UsersModule,
     AuthModule,
     FacilitiesModule,

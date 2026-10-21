@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { CreateSupportRequestDto } from './dto/create-support-request.dto';
@@ -12,12 +13,18 @@ import {
   AssignStaffTicketDto,
   AddTicketNoteDto,
 } from './dto/update-support-request.dto';
-import { SupportStatus, SupportPriority, UserStatus } from '@prisma/client';
+import { SupportStatus, SupportPriority, UserStatus, NotificationType } from '@prisma/client';
 import { UserRole } from '../common/enums/role.enum';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class SupportService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(SupportService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   /**
    * Tạo mã yêu cầu hỗ trợ duy nhất (Request Code)
@@ -58,7 +65,7 @@ export class SupportService {
 
     const requestCode = this.generateRequestCode();
 
-    return this.prisma.$transaction(async (tx) => {
+    const created = await this.prisma.$transaction(async (tx) => {
       const request = await tx.supportRequest.create({
         data: {
           requestCode,
@@ -102,6 +109,23 @@ export class SupportService {
 
       return request;
     });
+
+    // Notify facility staff in real time
+    this.notificationsService
+      .notifyFacilityStaff(
+        dto.facilityId,
+        `Yêu cầu hỗ trợ mới [${created.priority}]`,
+        `[${created.category}] ${created.subject}`,
+        NotificationType.SUPPORT,
+        'SUPPORT_REQUEST',
+        created.id,
+        { requestCode: created.requestCode, priority: created.priority },
+      )
+      .catch((err) =>
+        this.logger.error(`Failed to notify staff of new support ticket: ${err.message}`),
+      );
+
+    return created;
   }
 
   /**
@@ -291,7 +315,7 @@ export class SupportService {
         ? SupportStatus.IN_PROGRESS
         : request.status;
 
-    return this.prisma.$transaction(async (tx) => {
+    const assignResult = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.supportRequest.update({
         where: { id },
         data: {
@@ -323,6 +347,22 @@ export class SupportService {
         request: updated,
       };
     });
+
+    // Notify assigned staff
+    this.notificationsService
+      .create({
+        userId: staffId,
+        title: 'Phân công ticket hỗ trợ',
+        body: `Bạn vừa được phân công xử lý yêu cầu #${request.requestCode}: "${request.subject}".`,
+        type: NotificationType.SUPPORT,
+        entityType: 'SUPPORT_REQUEST',
+        entityId: request.id,
+      })
+      .catch((err) =>
+        this.logger.error(`Failed to notify assigned staff: ${err.message}`),
+      );
+
+    return assignResult;
   }
 
   /**
@@ -355,7 +395,7 @@ export class SupportService {
       data.photos = [...existingPhotos, ...dto.photos];
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const progressResult = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.supportRequest.update({
         where: { id },
         data,
@@ -384,6 +424,25 @@ export class SupportService {
         request: updated,
       };
     });
+
+    // Notify customer about ticket progress update
+    if (request.customerId) {
+      this.notificationsService
+        .create({
+          userId: request.customerId,
+          title: 'Cập nhật yêu cầu hỗ trợ',
+          body: `Ticket #${request.requestCode} đã được cập nhật sang trạng thái [${dto.status}].`,
+          type: NotificationType.SUPPORT,
+          entityType: 'SUPPORT_REQUEST',
+          entityId: request.id,
+          metadata: { status: dto.status, note: dto.note },
+        })
+        .catch((err) =>
+          this.logger.error(`Failed to notify customer of ticket update: ${err.message}`),
+        );
+    }
+
+    return progressResult;
   }
 
   /**

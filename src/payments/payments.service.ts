@@ -20,8 +20,10 @@ import {
   ReservationStatus,
   StorageUnitStatus,
   Prisma,
+  NotificationType,
 } from '@prisma/client';
 import { UserRole } from '../common/enums/role.enum';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class PaymentsService {
@@ -30,6 +32,7 @@ export class PaymentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly sePayService: SePayService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   /**
@@ -598,6 +601,43 @@ export class PaymentsService {
     this.logger.log(
       `Successfully confirmed Payment ${paymentCode} (Type: ${payment.paymentType}, Amount: ${receivedAmount}) via SePay Webhook ID ${payload.id}.`,
     );
+
+    // Dispatch real-time notification to customer and staff
+    const customerId = payment.reservation?.customerId || payment.contract?.customerId;
+    if (customerId) {
+      this.notificationsService
+        .create({
+          userId: customerId,
+          title: 'Thanh toán thành công',
+          body: `Giao dịch ${payment.paymentCode} trị giá ${receivedAmount.toLocaleString('vi-VN')} VND đã được xác nhận thành công.`,
+          type: NotificationType.PAYMENT,
+          entityType: 'PAYMENT',
+          entityId: result.id,
+          metadata: {
+            paymentCode: result.paymentCode,
+            amount: receivedAmount,
+            paymentType: result.paymentType,
+          },
+        })
+        .catch((err) =>
+          this.logger.error(`Failed to send customer payment notification: ${err.message}`),
+        );
+    }
+
+    if (payment.reservation?.facilityId) {
+      this.notificationsService
+        .notifyFacilityStaff(
+          payment.reservation.facilityId,
+          'Đơn đặt kho mới đã cọc',
+          `Đơn ${payment.reservation.reservationCode} vừa thanh toán cọc thành công. Vui lòng chuẩn bị lịch bàn giao.`,
+          NotificationType.RESERVATION,
+          'RESERVATION',
+          payment.reservation.id,
+        )
+        .catch((err) =>
+          this.logger.error(`Failed to notify facility staff: ${err.message}`),
+        );
+    }
 
     return {
       success: true,

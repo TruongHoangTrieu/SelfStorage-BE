@@ -192,6 +192,17 @@ enum SupportStatus {
   CANCELLED
 }
 
+enum NotificationType {
+  SYSTEM
+  RESERVATION
+  PAYMENT
+  CONTRACT
+  HANDOVER
+  RENEWAL
+  OVERDUE
+  SUPPORT
+}
+
 // ==========================================
 // 2. AUTH / USER (4 models)
 // ==========================================
@@ -235,6 +246,7 @@ model User {
   customerSupportRequests  SupportRequest[]          @relation("CustomerSupportRequests")
   assignedSupportRequests  SupportRequest[]          @relation("AssignedSupportRequests")
   supportRequestLogs       SupportRequestLog[]       @relation("UserSupportRequestLogs")
+  notifications            Notification[]            @relation("UserNotifications")
 
   @@index([roleId])
   @@index([status])
@@ -789,3 +801,28 @@ model UnitAccessLog {
   @@index([accessedAt])
   @@map("unit_access_logs")
 }
+
+// ==========================================
+// 16. NOTIFICATIONS
+// ==========================================
+
+model Notification {
+  id         String           @id @default(auto()) @map("_id") @db.ObjectId
+  userId     String           @db.ObjectId @map("user_id")
+  title      String           @map("title")
+  body       String           @map("body")
+  type       NotificationType @default(SYSTEM) @map("type")
+  entityType String?          @map("entity_type")
+  entityId   String?          @map("entity_id")
+  metadata   Json?            @map("metadata")
+  isRead     Boolean          @default(false) @map("is_read")
+  readAt     DateTime?        @map("read_at")
+  createdAt  DateTime         @default(now()) @map("created_at")
+
+  user User @relation("UserNotifications", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([userId, createdAt])
+  @@map("notifications")
+}
+
