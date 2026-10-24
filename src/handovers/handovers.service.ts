@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { CheckInDto } from './dto/check-in.dto';
+import { LogCccdAccessDto } from './dto/log-cccd-access.dto';
 import {
   ReservationStatus,
   ReservationRentalPeriodUnit,
@@ -20,12 +21,18 @@ import {
   Prisma,
 } from '@prisma/client';
 import { UserRole } from '../common/enums/role.enum';
+import { encryptCccd, decryptCccd, maskCccd, hashCccd } from '../common/utils/crypto.util';
+import { CloudinaryService } from '../common/cloudinary/cloudinary.service';
+import { Cron, CronExpression } from '@nestjs/schedule';
 
 @Injectable()
 export class HandoversService {
   private readonly logger = new Logger(HandoversService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cloudinaryService: CloudinaryService,
+  ) {}
 
   /**
    * Helper to calculate contract end date based on period and unit
@@ -105,6 +112,14 @@ export class HandoversService {
             email: true,
             phone: true,
             status: true,
+            identityType: true,
+            identityNumber: true,
+            identityIssueDate: true,
+            identityIssuePlace: true,
+            identityAddress: true,
+            identityFrontUrl: true,
+            identityBackUrl: true,
+            isIdentityVerified: true,
           },
         },
         items: {
@@ -173,6 +188,26 @@ export class HandoversService {
       this.logger.warn(`Could not record ActivityLog for handover profile access: ${logErr.message}`);
     }
 
+    // Mask identityNumber before returning to prevent unauthorized plain leak
+    if (reservation.customer?.identityNumber) {
+      (reservation.customer as any).maskedIdentityNumber = maskCccd(reservation.customer.identityNumber);
+      delete (reservation.customer as any).identityNumber;
+    }
+
+    // Generate fresh signed URLs for CCCD front and back (valid 5 minutes)
+    if (reservation.customer?.identityFrontUrl) {
+      reservation.customer.identityFrontUrl = this.cloudinaryService.generateSignedCccdUrl(
+        reservation.customer.identityFrontUrl,
+        300,
+      );
+    }
+    if (reservation.customer?.identityBackUrl) {
+      reservation.customer.identityBackUrl = this.cloudinaryService.generateSignedCccdUrl(
+        reservation.customer.identityBackUrl,
+        300,
+      );
+    }
+
     return reservation;
   }
 
@@ -186,6 +221,7 @@ export class HandoversService {
       where: { id: dto.reservationId },
       include: {
         facility: true,
+        customer: true,
         items: {
           include: {
             unit: true,
@@ -304,7 +340,44 @@ export class HandoversService {
         }
       }
 
-      // Create RentalContract
+      // Resolve customer identity info for contract snapshot
+      let customerIdentityType = reservation.customer?.identityType;
+      let customerIdentityNumber = reservation.customer?.identityNumber;
+      let customerAddress = reservation.customer?.identityAddress;
+      let customerIdentityFrontUrl = dto.identityFrontUrl || reservation.customer?.identityFrontUrl;
+      let customerIdentityBackUrl = dto.identityBackUrl || reservation.customer?.identityBackUrl;
+
+      const userIdentityUpdate: any = {};
+      if (dto.identityNumber && dto.identityNumber.trim()) {
+        const cleanId = dto.identityNumber.trim();
+        customerIdentityType = dto.identityType || customerIdentityType || 'CCCD';
+        customerIdentityNumber = encryptCccd(cleanId);
+        customerAddress = dto.identityAddress?.trim() || customerAddress;
+        userIdentityUpdate.identityType = customerIdentityType;
+        userIdentityUpdate.identityNumber = customerIdentityNumber;
+        userIdentityUpdate.identityHash = hashCccd(cleanId);
+        userIdentityUpdate.identityAddress = customerAddress;
+      }
+      if (dto.identityFrontUrl) {
+        userIdentityUpdate.identityFrontUrl = dto.identityFrontUrl;
+      }
+      if (dto.identityBackUrl) {
+        userIdentityUpdate.identityBackUrl = dto.identityBackUrl;
+      }
+      if (dto.isIdentityVerified !== undefined) {
+        userIdentityUpdate.isIdentityVerified = dto.isIdentityVerified;
+      } else if (dto.identityNumber || dto.identityFrontUrl) {
+        userIdentityUpdate.isIdentityVerified = true;
+      }
+
+      if (Object.keys(userIdentityUpdate).length > 0) {
+        await tx.user.update({
+          where: { id: reservation.customerId },
+          data: userIdentityUpdate,
+        });
+      }
+
+      // Create RentalContract with identity snapshot
       const contract = await tx.rentalContract.create({
         data: {
           contractCode,
@@ -314,6 +387,11 @@ export class HandoversService {
           endDate,
           status: ContractStatus.ACTIVE,
           signedAt: new Date(),
+          customerIdentityType,
+          customerIdentityNumber,
+          customerIdentityFrontUrl,
+          customerIdentityBackUrl,
+          customerAddress,
         },
       });
 
@@ -440,6 +518,121 @@ export class HandoversService {
         })),
       };
     });
+  }
+
+  /**
+   * Record Audit Log when staff unmasks or prints contract with CCCD and return decrypted value
+   */
+  async logCccdAccess(dto: LogCccdAccessDto, user: any, clientIp?: string) {
+    const reservation = await this.prisma.reservation.findUnique({
+      where: { id: dto.reservationId },
+      include: {
+        customer: true,
+        facility: true,
+      },
+    });
+
+    if (!reservation) {
+      throw new NotFoundException(`Reservation #${dto.reservationId} not found`);
+    }
+
+    const userRole = typeof user.role === 'string' ? user.role : user.role?.name;
+    await this.verifyStaffFacilityScope(
+      user.id,
+      userRole,
+      reservation.facilityId,
+      reservation.facility?.name,
+    );
+
+    const isPrint = dto.action === 'PRINT_CONTRACT_WITH_CCCD';
+    const actionDesc = isPrint
+      ? `Nhân viên đã xuất in hợp đồng chứa thông tin CCCD cho đơn #${reservation.reservationCode || reservation.id} (Khách: ${dto.customerName || reservation.customer?.fullName || 'N/A'}) | IP: ${clientIp || 'N/A'}`
+      : `Nhân viên đã mở xem toàn bộ số CCCD cho đơn #${reservation.reservationCode || reservation.id} (Khách: ${dto.customerName || reservation.customer?.fullName || 'N/A'}) | IP: ${clientIp || 'N/A'}`;
+
+    await this.prisma.activityLog.create({
+      data: {
+        userId: user.id,
+        action: isPrint ? 'PRINT_CONTRACT_WITH_CCCD' : 'VIEW_UNMASKED_CCCD',
+        entityType: 'RESERVATION',
+        entityId: reservation.id,
+        description: actionDesc,
+      },
+    });
+
+    const decryptedNumber = reservation.customer?.identityNumber
+      ? decryptCccd(reservation.customer.identityNumber)
+      : null;
+
+    // Generate fresh 5-minute signed URLs for private authenticated CCCD images
+    const frontSignedUrl = reservation.customer?.identityFrontUrl
+      ? this.cloudinaryService.generateSignedCccdUrl(reservation.customer.identityFrontUrl, 300)
+      : null;
+    const backSignedUrl = reservation.customer?.identityBackUrl
+      ? this.cloudinaryService.generateSignedCccdUrl(reservation.customer.identityBackUrl, 300)
+      : null;
+
+    return {
+      success: true,
+      identityType: reservation.customer?.identityType || 'CCCD',
+      identityNumber: decryptedNumber,
+      identityIssueDate: reservation.customer?.identityIssueDate,
+      identityIssuePlace: reservation.customer?.identityIssuePlace,
+      identityAddress: reservation.customer?.identityAddress,
+      identityFrontUrl: frontSignedUrl,
+      identityBackUrl: backSignedUrl,
+    };
+  }
+
+  /**
+   * Tự động xóa vĩnh viễn ảnh CCCD của các hợp đồng đã hoàn tất / thanh lý quá 30 ngày
+   * Tuân thủ quy định về giới hạn thời gian lưu trữ dữ liệu cá nhân (Nghị định 13/2023/NĐ-CP)
+   */
+  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
+  async cleanupExpiredCccdPhotos() {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    try {
+      const expiredContracts = await this.prisma.rentalContract.findMany({
+        where: {
+          status: { in: [ContractStatus.COMPLETED, ContractStatus.TERMINATED] },
+          endDate: { lte: thirtyDaysAgo },
+          OR: [
+            { customerIdentityFrontUrl: { not: null } },
+            { customerIdentityBackUrl: { not: null } },
+          ],
+        },
+        select: {
+          id: true,
+          contractCode: true,
+          customerIdentityFrontUrl: true,
+          customerIdentityBackUrl: true,
+        },
+      });
+
+      for (const contract of expiredContracts) {
+        if (contract.customerIdentityFrontUrl) {
+          await this.cloudinaryService.deleteImage(contract.customerIdentityFrontUrl, 'authenticated');
+        }
+        if (contract.customerIdentityBackUrl) {
+          await this.cloudinaryService.deleteImage(contract.customerIdentityBackUrl, 'authenticated');
+        }
+
+        await this.prisma.rentalContract.update({
+          where: { id: contract.id },
+          data: {
+            customerIdentityFrontUrl: null,
+            customerIdentityBackUrl: null,
+          },
+        });
+
+        this.logger.log(
+          `[Auto-deletion] Đã tự động xóa vĩnh viễn 2 ảnh CCCD của hợp đồng #${contract.contractCode} (Hết hạn lưu trữ 30 ngày)`,
+        );
+      }
+    } catch (err: any) {
+      this.logger.error(`Error running cleanupExpiredCccdPhotos: ${err.message}`);
+    }
   }
 }
 

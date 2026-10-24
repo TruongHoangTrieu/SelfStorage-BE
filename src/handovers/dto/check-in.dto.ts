@@ -3,7 +3,10 @@ import {
   IsOptional,
   IsString,
   IsArray,
+  IsEnum,
+  IsBoolean,
 } from 'class-validator';
+import { IdentityType } from '@prisma/client';
 
 export class CheckInDto {
   @IsString({ message: 'reservationId must be a string' })
@@ -21,4 +24,28 @@ export class CheckInDto {
   @IsOptional()
   @IsArray({ message: 'photos must be an array of photo URLs or objects' })
   photos?: any[];
+
+  @IsOptional()
+  @IsEnum(IdentityType)
+  identityType?: IdentityType;
+
+  @IsOptional()
+  @IsString()
+  identityNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  identityAddress?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isIdentityVerified?: boolean;
+
+  @IsOptional()
+  @IsString()
+  identityFrontUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  identityBackUrl?: string;
 }

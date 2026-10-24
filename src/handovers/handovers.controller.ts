@@ -10,6 +10,7 @@ import {
   UseInterceptors,
   UploadedFile,
   BadRequestException,
+  Req,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
@@ -27,6 +28,8 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { UserRole } from '../common/enums/role.enum';
+
+import { LogCccdAccessDto } from './dto/log-cccd-access.dto';
 
 @ApiTags('Handovers & Check-In')
 @ApiBearerAuth('JWT-auth')
@@ -72,6 +75,51 @@ export class HandoversController {
     @CurrentUser() user: any,
   ) {
     return this.handoversService.checkIn(checkInDto, user);
+  }
+
+  @ApiOperation({ summary: 'Ghi nhận Audit Log khi mở xem hoặc in CCCD, trả về số CCCD giải mã và Signed URL ảnh' })
+  @ApiResponse({ status: 200, description: 'Ghi log thành công và trả về số giải mã' })
+  @Roles(
+    UserRole.FACILITY_STAFF,
+    UserRole.FACILITY_MANAGER,
+    UserRole.BUSINESS_OPERATIONS_MANAGER,
+    UserRole.SYSTEM_ADMINISTRATOR,
+  )
+  @Post('log-cccd-access')
+  @HttpCode(HttpStatus.OK)
+  async logCccdAccess(
+    @Body() dto: LogCccdAccessDto,
+    @CurrentUser() user: any,
+    @Req() req: any,
+  ) {
+    const clientIp =
+      req.headers?.['x-forwarded-for']?.toString().split(',')[0].trim() ||
+      req.socket?.remoteAddress ||
+      req.ip ||
+      '127.0.0.1';
+    return this.handoversService.logCccdAccess(dto, user, clientIp);
+  }
+
+  @ApiOperation({ summary: 'Tải ảnh CCCD bảo mật (Private Authenticated + Watermark chống lạm dụng)' })
+  @ApiResponse({ status: 200, description: 'Tải ảnh CCCD thành công, trả về Signed URL tạm thời 5 phút' })
+  @Roles(
+    UserRole.FACILITY_STAFF,
+    UserRole.FACILITY_MANAGER,
+    UserRole.BUSINESS_OPERATIONS_MANAGER,
+    UserRole.SYSTEM_ADMINISTRATOR,
+  )
+  @Post('upload-cccd')
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(FileInterceptor('photo'))
+  async uploadCccd(
+    @UploadedFile() file: Express.Multer.File,
+    @Body('reservationCode') reservationCode?: string,
+    @Body('side') side?: 'front' | 'back',
+  ) {
+    if (!file) {
+      throw new BadRequestException('Vui lòng chọn tệp ảnh CCCD để tải lên');
+    }
+    return this.cloudinaryService.uploadCccdImage(file, { reservationCode, side });
   }
 
   @ApiOperation({ summary: 'Tải ảnh hiện trạng bàn giao lên Cloudinary' })

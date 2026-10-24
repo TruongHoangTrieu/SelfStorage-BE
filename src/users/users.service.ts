@@ -151,18 +151,49 @@ export class UsersService implements OnModuleInit {
     });
   }
 
-  async updateProfile(userId: string, data: { fullName?: string; phone?: string }) {
+  async updateProfile(
+    userId: string,
+    data: {
+      fullName?: string;
+      phone?: string;
+      identityType?: any;
+      identityNumber?: string;
+      identityIssueDate?: string;
+      identityIssuePlace?: string;
+      identityAddress?: string;
+    },
+  ) {
     const existing = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!existing) {
       throw new NotFoundException(`User with ID ${userId} not found`);
     }
 
+    const { encryptCccd, hashCccd } = await import('../common/utils/crypto.util');
+
+    const updatePayload: any = {};
+    if (data.fullName !== undefined) updatePayload.fullName = data.fullName.trim();
+    if (data.phone !== undefined) updatePayload.phone = data.phone?.trim() || null;
+    if (data.identityType !== undefined) updatePayload.identityType = data.identityType;
+    if (data.identityIssuePlace !== undefined) updatePayload.identityIssuePlace = data.identityIssuePlace?.trim() || null;
+    if (data.identityAddress !== undefined) updatePayload.identityAddress = data.identityAddress?.trim() || null;
+    if (data.identityIssueDate !== undefined) {
+      updatePayload.identityIssueDate = data.identityIssueDate ? new Date(data.identityIssueDate) : null;
+    }
+
+    if (data.identityNumber !== undefined && data.identityNumber !== null) {
+      const cleanId = data.identityNumber.trim();
+      if (cleanId) {
+        updatePayload.identityNumber = encryptCccd(cleanId);
+        updatePayload.identityHash = hashCccd(cleanId);
+      } else {
+        updatePayload.identityNumber = null;
+        updatePayload.identityHash = null;
+      }
+    }
+
     const updated = await this.prisma.user.update({
       where: { id: userId },
-      data: {
-        ...(data.fullName !== undefined ? { fullName: data.fullName.trim() } : {}),
-        ...(data.phone !== undefined ? { phone: data.phone?.trim() || null } : {}),
-      },
+      data: updatePayload,
       include: {
         role: true,
       },
@@ -201,10 +232,16 @@ export class UsersService implements OnModuleInit {
 
   sanitizeUser(user: any) {
     if (!user) return null;
-    const { passwordHash, role, roleId, staffFacilityAssignments, ...sanitized } = user;
+    const { passwordHash, role, roleId, staffFacilityAssignments, identityHash, ...sanitized } = user;
     let roleName = typeof role === 'object' && role !== null ? role.name : role;
     if (roleName === 'CUSTOMER') roleName = UserRole.STORAGE_CUSTOMER;
     if (roleName === 'OPERATIONS_STAFF') roleName = UserRole.FACILITY_STAFF;
+
+    // Mask identityNumber if present for privacy
+    if (sanitized.identityNumber) {
+      const { maskCccd } = require('../common/utils/crypto.util');
+      sanitized.maskedIdentityNumber = maskCccd(sanitized.identityNumber);
+    }
 
     // Resolve active assigned facility for staff and manager
     let facilityId: string | null = null;

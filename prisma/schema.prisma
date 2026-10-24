@@ -106,6 +106,12 @@ enum PaymentStatus {
   CANCELLED
 }
 
+enum IdentityType {
+  CCCD
+  PASSPORT
+  BUSINESS_LICENSE
+}
+
 enum PolicyValueType {
   NUMBER
   STRING
@@ -231,6 +237,17 @@ model User {
   createdAt    DateTime   @default(now()) @map("created_at")
   updatedAt    DateTime   @updatedAt @map("updated_at")
 
+  // Identity / CCCD fields (encrypted at application level)
+  identityType       IdentityType? @map("identity_type")
+  identityNumber     String?       @map("identity_number")
+  identityHash       String?       @map("identity_hash")
+  identityIssueDate  DateTime?     @map("identity_issue_date")
+  identityIssuePlace String?       @map("identity_issue_place")
+  identityAddress    String?       @map("identity_address")
+  identityFrontUrl   String?       @map("identity_front_url")
+  identityBackUrl    String?       @map("identity_back_url")
+  isIdentityVerified Boolean       @default(false) @map("is_identity_verified")
+
   role Role @relation(fields: [roleId], references: [id])
 
   staffFacilityAssignments StaffFacilityAssignment[] @relation("UserFacilityAssignments")
@@ -250,6 +267,7 @@ model User {
 
   @@index([roleId])
   @@index([status])
+  @@index([identityHash])
   @@map("users")
 }
 
@@ -428,6 +446,13 @@ model RentalContract {
   signedAt      DateTime?      @map("signed_at")
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  // Identity snapshot at contract signing time
+  customerIdentityType     IdentityType? @map("customer_identity_type")
+  customerIdentityNumber   String?       @map("customer_identity_number")
+  customerIdentityFrontUrl String?       @map("customer_identity_front_url")
+  customerIdentityBackUrl  String?       @map("customer_identity_back_url")
+  customerAddress          String?       @map("customer_address")
 
   reservation    Reservation       @relation(fields: [reservationId], references: [id])
   customer       User              @relation("CustomerContracts", fields: [customerId], references: [id])
