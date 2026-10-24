@@ -23,14 +23,21 @@ import {
   RenewalStatus,
   OverdueStatus,
   AccessCodeStatus,
+  NotificationType,
 } from '@prisma/client';
 import { UserRole } from '../common/enums/role.enum';
+import { AiService } from '../ai/ai.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class RenewalsService {
   private readonly logger = new Logger(RenewalsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly aiService: AiService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   // =========================================================================
   // 1. CONTRACT RENEWAL (GIA HẠN HỢP ĐỒNG)
@@ -488,17 +495,92 @@ export class RenewalsService {
         },
         include: {
           customer: { select: { id: true, fullName: true, email: true, phone: true } },
+          contractItems: {
+            include: { unit: { include: { unitType: true } } },
+          },
+          overdueRecords: true,
         },
       });
 
       if (expiringContracts.length > 0) {
         this.logger.warn(
-          `[EXPIRY WARNING] Phát hiện ${expiringContracts.length} hợp đồng sắp hết hạn trong ${days} ngày tới. Cần gửi email/SMS nhắc gia hạn!`,
+          `[EXPIRY WARNING] Phát hiện ${expiringContracts.length} hợp đồng sắp hết hạn trong ${days} ngày tới. Đang chạy mô hình AI chấm điểm gia hạn...`,
         );
-        for (const c of expiringContracts) {
-          this.logger.log(
-            ` - Hợp đồng #${c.contractCode} (Khách hàng: ${c.customer.fullName} - ${c.customer.phone}) hết hạn vào ${c.endDate.toISOString().slice(0, 10)}`,
+
+        // Chuẩn bị vector đặc trưng gửi sang AI Service
+        const featurePayload = expiringContracts.map((c) => {
+          const start = new Date(c.startDate);
+          const rentedMonths = Math.max(
+            1,
+            Math.round((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 30)),
           );
+          const sizeM2 = c.contractItems[0]?.unit?.unitType?.size || 6.0;
+
+          return {
+            contractId: c.id,
+            contractCode: c.contractCode,
+            endDate: c.endDate.toISOString().slice(0, 10),
+            rented_months: rentedMonths,
+            unit_size_m2: Number(sizeM2),
+            price_per_m2_ratio: 1.0,
+            late_payments_count: c.overdueRecords.length,
+            overdue_fees_count: c.overdueRecords.length,
+            access_count_last_30d: 4,
+            days_since_last_access: 3,
+            support_tickets_count: 0,
+            has_discount: 1,
+            month_of_year: c.endDate.getMonth() + 1,
+            facility_occupancy_rate: 0.85,
+          };
+        });
+
+        const predictions = await this.aiService.predictRenewalsBatch(featurePayload);
+
+        for (const c of expiringContracts) {
+          const pred = predictions.find((p: any) => p.contract_id === c.id);
+          const messageBody = pred?.personalized_message ||
+            `Hợp đồng #${c.contractCode} của bạn sẽ hết hạn vào ngày ${c.endDate.toISOString().slice(0, 10)}. Vui lòng kiểm tra và gia hạn sớm!`;
+
+          this.logger.log(
+            ` - Hợp đồng #${c.contractCode} (Khách: ${c.customer.fullName}) -> Xác suất gia hạn: ${pred?.renewal_probability ?? 'N/A'} (Mức: ${pred?.probability_tier ?? 'N/A'}, Gợi ý: Gói ${pred?.recommended_package ?? 3} tháng)`,
+          );
+
+          // 1. Lưu bản ghi dự đoán vào AiPrediction
+          if (pred) {
+            try {
+              await this.prisma.aiPrediction.create({
+                data: {
+                  contractId: c.id,
+                  renewalProbability: pred.renewal_probability,
+                  recommendedPackage: pred.recommended_package,
+                  probabilityTier: pred.probability_tier,
+                  action: pred.action,
+                  modelVersion: pred.model_version || 'v1.0',
+                },
+              });
+            } catch (e: any) {
+              this.logger.warn(`Lỗi lưu AiPrediction: ${e?.message}`);
+            }
+          }
+
+          // 2. Gửi thông báo trực tiếp đến khách hàng
+          try {
+            await this.notificationsService.create({
+              userId: c.customerId,
+              title: `[Nhắc gia hạn] Hợp đồng #${c.contractCode} sắp hết hạn trong ${days} ngày`,
+              body: messageBody,
+              type: NotificationType.RENEWAL,
+              entityType: 'CONTRACT',
+              entityId: c.id,
+              metadata: pred ? {
+                probabilityTier: pred.probability_tier,
+                recommendedPackage: pred.recommended_package,
+                action: pred.action,
+              } : undefined,
+            });
+          } catch (e: any) {
+            this.logger.warn(`Lỗi gửi notification gia hạn: ${e?.message}`);
+          }
         }
       }
     }

@@ -1,0 +1,121 @@
+name,aliases,category,length_cm,width_cm,height_cm,stackable
+Tủ lạnh 1 cánh,tủ lạnh mini;tủ lạnh nhỏ;tủ lạnh 1 cửa,Điện máy,55,55,120,false
+Tủ lạnh,tủ lạnh 2 cánh;tủ lạnh 2 cửa;tủ lạnh thường;tủ đông,Điện máy,70,70,170,false
+Tủ lạnh side by side,tủ lạnh lớn;tủ lạnh 4 cánh;tủ lạnh to;tủ lạnh side-by-side,Điện máy,92,75,180,false
+Máy giặt,máy giặt cửa trên;máy giặt cửa ngang;máy giặt lồng,Điện máy,60,60,90,false
+Máy sấy quần áo,máy sấy đồ,Điện máy,60,60,85,false
+Tivi 32 inch,tv 32;tivi nhỏ;ti vi 32,Điện máy,75,10,45,false
+Tivi 55 inch,tivi;tv;ti vi;tivi 50 inch;tivi lớn;tv 55,Điện máy,125,12,75,false
+Tivi 65 inch,tivi 65;tv 65;tivi 75 inch;tivi rất lớn,Điện máy,150,15,90,false
+Máy lạnh,điều hòa;máy điều hòa;cục nóng;dàn lạnh,Điện máy,85,30,60,false
+Quạt đứng,quạt;quạt cây;quạt điện,Điện máy,45,45,120,false
+Quạt trần,,Điện máy,60,60,25,true
+Lò vi sóng,lò viba,Điện máy,50,40,30,true
+Lò nướng,,Điện máy,55,45,35,true
+Bếp ga,bếp gas;bếp ga đôi,Điện máy,70,40,15,true
+Bếp từ,bếp điện,Điện máy,70,40,10,true
+Nồi cơm điện,nồi cơm,Điện máy,35,30,30,true
+Máy lọc nước,cây nước nóng lạnh;cây nước,Điện máy,40,40,100,false
+Máy hút bụi,,Điện máy,45,35,35,true
+Máy tính để bàn,pc;case máy tính;máy bàn,Điện máy,45,25,50,true
+Màn hình máy tính,màn hình,Điện máy,60,20,45,true
+Máy in,máy photocopy mini,Điện máy,50,40,30,true
+Loa thùng,loa;dàn loa;loa kéo,Điện máy,45,40,70,false
+Đàn piano điện,piano điện;đàn organ,Nhạc cụ,140,40,90,false
+Đàn piano cơ,piano;đàn piano,Nhạc cụ,150,60,125,false
+Đàn guitar,guitar;ghi ta,Nhạc cụ,105,40,12,false
+Trống điện,bộ trống;trống jazz,Nhạc cụ,120,100,120,false
+Giường đơn,giường 1m;giường 1m2;giường nhỏ,Nội thất,200,120,45,false
+Giường đôi,giường;giường 1m6;giường ngủ,Nội thất,200,160,45,false
+Giường king,giường 1m8;giường 2m;giường lớn,Nội thất,200,180,45,false
+Giường tầng,,Nội thất,200,100,160,false
+Nệm đơn,đệm đơn;nệm 1m2,Nội thất,200,120,20,true
+Nệm,đệm;nệm đôi;nệm 1m6;tấm nệm;tấm đệm,Nội thất,200,160,25,true
+Nệm king,đệm 1m8;nệm 1m8;nệm lớn,Nội thất,200,180,25,true
+Tủ quần áo 2 cánh,tủ quần áo nhỏ;tủ đồ nhỏ,Nội thất,90,55,180,false
+Tủ quần áo,tủ quần áo 3 cánh;tủ áo;tủ đồ;tủ gỗ,Nội thất,140,60,200,false
+Tủ quần áo 4 cánh,tủ quần áo lớn;tủ quần áo to,Nội thất,180,60,210,false
+Tủ giày,kệ giày,Nội thất,80,35,100,false
+Tủ đầu giường,tab đầu giường;táp đầu giường,Nội thất,45,40,50,true
+Tủ tivi,kệ tivi;kệ tv,Nội thất,160,40,50,false
+Tủ bếp,tủ chén;tủ đựng chén bát,Nội thất,120,50,180,false
+Tủ hồ sơ,tủ tài liệu;tủ sắt,Văn phòng,90,45,185,false
+Kệ sách,giá sách;tủ sách,Nội thất,80,30,180,false
+Kệ sắt,kệ để đồ;giá kệ;kệ v lỗ,Nội thất,100,40,180,false
+Bàn trang điểm,,Nội thất,90,45,140,false
+Bàn ăn 4 ghế,bàn ăn;bàn ăn nhỏ,Nội thất,120,75,75,false
+Bàn ăn 6 ghế,bàn ăn lớn;bàn tiệc,Nội thất,160,90,75,false
+Ghế ăn,ghế gỗ;ghế tựa,Nội thất,45,45,90,true
+Ghế nhựa,ghế đẩu;ghế nhựa đỏ,Nội thất,40,40,45,true
+Bàn làm việc,bàn học;bàn máy tính;bàn văn phòng,Nội thất,120,60,75,false
+Ghế văn phòng,ghế xoay;ghế làm việc;ghế gaming,Văn phòng,65,65,115,false
+Bàn trà,bàn sofa;bàn nước,Nội thất,100,55,45,false
+Sofa đơn,ghế sofa đơn;ghế bành,Nội thất,90,85,85,false
+Sofa 2 chỗ,ghế sofa 2 chỗ;sofa nhỏ,Nội thất,160,85,85,false
+Sofa 3 chỗ,sofa;ghế sofa;bộ sofa,Nội thất,210,90,85,false
+Sofa góc chữ L,sofa góc;sofa chữ l;sofa lớn,Nội thất,260,170,85,false
+Gương đứng,gương soi;gương toàn thân,Nội thất,60,5,170,false
+Tranh treo tường,tranh;khung tranh,Trang trí,80,5,60,true
+Đèn cây,đèn đứng;đèn sàn,Trang trí,40,40,160,false
+Thảm trải sàn,thảm;tấm thảm,Trang trí,200,30,30,true
+Chậu cây cảnh,chậu cây;cây cảnh;chậu kiểng,Trang trí,40,40,60,false
+Thùng carton nhỏ,thùng nhỏ;hộp carton nhỏ;thùng giấy nhỏ,Thùng hộp,40,30,30,true
+Thùng carton,thùng;thùng giấy;thùng các tông;hộp carton;thùng carton vừa;thùng đồ,Thùng hộp,50,40,40,true
+Thùng carton lớn,thùng lớn;thùng to;thùng carton to;hộp carton lớn,Thùng hộp,60,50,50,true
+Thùng nhựa,hộp nhựa;thùng nhựa có nắp,Thùng hộp,60,40,35,true
+Vali,va li;vali kéo;hành lý,Thùng hộp,45,30,70,true
+Bao tải đồ,bao đồ;túi đồ;bao quần áo;túi quần áo,Thùng hộp,60,40,40,true
+Xe máy,xe gắn máy;xe tay ga;xe số;honda,Phương tiện,190,70,110,false
+Xe máy điện,xe điện,Phương tiện,170,65,105,false
+Xe đạp,xe đạp thể thao;xe đạp địa hình,Phương tiện,175,60,105,false
+Xe đạp trẻ em,xe đạp nhỏ;xe đạp con nít,Phương tiện,120,50,80,false
+Xe đẩy em bé,xe đẩy;xe nôi,Đồ trẻ em,85,55,100,false
+Nôi em bé,cũi;giường cũi;nôi,Đồ trẻ em,120,65,95,false
+Ghế ô tô trẻ em,ghế ngồi ô tô,Đồ trẻ em,50,50,65,true
+Đồ chơi trẻ em,đồ chơi,Đồ trẻ em,50,40,40,true
+Máy chạy bộ,máy tập chạy,Thể thao,180,80,140,false
+Xe đạp tập,xe đạp tập thể dục,Thể thao,110,55,140,false
+Ghế massage,ghế mát xa,Thể thao,140,80,120,false
+Tạ tay,tạ;bộ tạ,Thể thao,40,30,20,true
+Giàn tạ,ghế tập tạ;dàn tạ,Thể thao,150,100,150,false
+Bàn bóng bàn,bàn ping pong,Thể thao,160,30,150,false
+Ván lướt sóng,ván;ván trượt,Thể thao,200,55,10,false
+Túi golf,bộ gậy golf;gậy golf,Thể thao,130,35,35,false
+Lều cắm trại,lều;đồ cắm trại;đồ camping,Thể thao,60,25,25,true
+Ba lô,balo;túi xách,Thùng hộp,45,30,20,true
+Bàn ghế ngoài trời,bàn ghế sân vườn;bàn cafe,Nội thất,120,80,75,false
+Bàn họp,bàn hội nghị,Văn phòng,240,120,75,false
+Két sắt,két,Văn phòng,50,45,70,false
+Hồ sơ giấy tờ,tài liệu;giấy tờ;chứng từ;hồ sơ,Văn phòng,40,30,30,true
+Máy chiếu,projector,Văn phòng,35,30,15,true
+Bảng trắng,bảng viết,Văn phòng,120,5,90,false
+Vách ngăn văn phòng,vách ngăn,Văn phòng,120,5,150,false
+Kệ hàng hóa,kệ siêu thị;kệ trưng bày,Kinh doanh,120,45,180,false
+Hàng hóa đóng thùng,thùng hàng;hàng tồn;hàng hóa,Kinh doanh,50,40,40,true
+Pallet hàng,pallet,Kinh doanh,120,100,120,false
+Tủ trưng bày,tủ kính,Kinh doanh,100,45,180,false
+Tủ mát,tủ đông công nghiệp;tủ mát kinh doanh,Kinh doanh,70,70,200,false
+Máy may,máy khâu,Dụng cụ,50,25,35,true
+Bộ dụng cụ sửa chữa,hộp đồ nghề;dụng cụ;đồ nghề,Dụng cụ,50,25,25,true
+Thang nhôm,thang;thang gấp,Dụng cụ,170,50,15,false
+Máy khoan,máy cắt;máy mài,Dụng cụ,40,30,15,true
+Bình ga,bình gas,Dụng cụ,35,35,60,false
+Chén bát,đồ bếp;nồi niêu;xoong nồi;bát đĩa,Đồ bếp,50,40,40,true
+Bàn ủi,bàn là;cầu là,Đồ gia dụng,130,35,10,true
+Rèm cửa,màn cửa,Đồ gia dụng,60,40,30,true
+Chăn ga gối,chăn;mền;gối;chăn gối;ga giường,Đồ gia dụng,60,40,40,true
+Quần áo,đồ quần áo;áo quần;đồ mặc,Đồ gia dụng,60,40,40,true
+Giày dép,giày;dép,Đồ gia dụng,35,25,15,true
+Sách,truyện;sách vở,Đồ gia dụng,40,30,30,true
+Bình hoa,lọ hoa;đồ gốm,Trang trí,30,30,40,true
+Đồ thờ cúng,bàn thờ;tủ thờ,Nội thất,120,60,120,false
+Bể cá,hồ cá,Trang trí,100,40,50,false
+Lốp xe,vỏ xe;bánh xe,Phương tiện,65,65,20,true
+Mâm cơm,mâm,Đồ bếp,70,70,10,true
+Nồi lẩu,nồi to,Đồ bếp,40,40,30,true
+Máy rửa bát,máy rửa chén,Điện máy,60,60,85,false
+Máy nước nóng,bình nóng lạnh;bình nước nóng,Điện máy,50,35,35,true
+Tủ rượu,tủ trưng rượu,Nội thất,90,40,180,false
+Ghế lười,ghế hạt xốp,Nội thất,90,90,90,false
+Võng,võng xếp,Nội thất,240,30,20,false
+Cây treo quần áo,giá treo đồ;sào phơi,Đồ gia dụng,150,45,15,false

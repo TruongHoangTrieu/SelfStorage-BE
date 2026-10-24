@@ -826,3 +826,48 @@ model Notification {
   @@map("notifications")
 }
 
+// ==========================================
+// 17. AI ASSISTANT (ItemCatalog, RAG Chunks, ML Predictions)
+// ==========================================
+
+model ItemCatalog {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  name      String   @unique @map("name")
+  aliases   String[] @default([]) @map("aliases")
+  category  String   @map("category")
+  lengthCm  Float    @map("length_cm")
+  widthCm   Float    @map("width_cm")
+  heightCm  Float    @map("height_cm")
+  volumeM3  Float    @map("volume_m3")
+  stackable Boolean  @default(false) @map("stackable")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("item_catalog")
+}
+
+model KnowledgeChunk {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  documentName String   @map("document_name")
+  section      String   @map("section")
+  content      String   @map("content")
+  embedding    Float[]  @default([]) @map("embedding")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("knowledge_chunks")
+}
+
+model AiPrediction {
+  id                 String   @id @default(auto()) @map("_id") @db.ObjectId
+  contractId         String   @db.ObjectId @map("contract_id")
+  renewalProbability Float    @map("renewal_probability")
+  recommendedPackage Int      @map("recommended_package")
+  probabilityTier    String   @map("probability_tier")
+  action             String   @map("action")
+  modelVersion       String   @default("v1.0") @map("model_version")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  @@index([contractId])
+  @@map("ai_predictions")
+}
+
+

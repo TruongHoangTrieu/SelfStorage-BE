@@ -18,6 +18,7 @@ import { PaymentsModule } from './payments/payments.module';
 import { RenewalsModule } from './renewals/renewals.module';
 import { CloudinaryModule } from './common/cloudinary/cloudinary.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { AiModule } from './ai/ai.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     SupportModule,
     PaymentsModule,
     RenewalsModule,
+    AiModule,
   ],
   controllers: [AppController],
   providers: [AppService],

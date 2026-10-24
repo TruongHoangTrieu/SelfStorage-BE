@@ -1,0 +1,81 @@
+# CHÍNH SÁCH VẬN HÀNH VÀ SỬ DỤNG HỆ THỐNG KHO LƯU TRỮ TỰ PHỤC VỤ (SELF-STORAGE)
+
+---
+[DOCUMENT: Bang_Gia_Va_Goi_Thue]
+[SECTION: Cac_Loai_Kho_Va_Dung_Tich]
+Hệ thống cung cấp đa dạng các cỡ kho phục vụ nhu cầu cá nhân và doanh nghiệp:
+- **Tủ Locker Thông Minh (TYPE_LOCKER)**: Diện tích **1m²**, thể tích **1 CBM (1m³)**, cọc **300.000 VNĐ**, giá thuê tham khảo **450.000 VNĐ/tháng**. Phù hợp lưu tài liệu, đồ đạc nhỏ, balo cá nhân.
+- **Kho Mini Cá Nhân (TYPE_MINI_1)**: Diện tích **2m²**, thể tích **2 CBM** (cao 1-2m), cọc **10.000 - 300.000 VNĐ**, giá thuê từ **20.000 - 500.000 VNĐ/tháng**. Phù hợp cho sinh viên, chuyển trọ, cất 5-10 thùng carton.
+- **Kho Tự Quản Đồ Dùng (TYPE_AP_1)**: Diện tích **4m²**, thể tích **4 - 5 CBM**, cọc **800.000 VNĐ**, giá thuê **950.000 VNĐ/tháng**. Thích hợp chứa đồ gia đình nhỏ, xe máy, đồ cắm trại thể thao.
+- **Kho Gia Đình Tiêu Chuẩn (TYPE_STD_1)**: Diện tích **6m²**, thể tích **6 - 8 CBM**, cọc **1.000.000 VNĐ**, giá thuê **1.200.000 VNĐ/tháng**. Phù hợp hộ gia đình chuyển nhà chứa sofa, tủ lạnh, máy giặt, đệm.
+- **Kho Căn Hộ Cao Cấp (TYPE_LM_1)**: Diện tích **8m²**, thể tích **8 - 10 CBM**, cọc **1.500.000 VNĐ**, giá thuê **1.600.000 VNĐ/tháng**.
+- **Kho Doanh Nghiệp Lớn (TYPE_LARGE_1)**: Diện tích **18m²**, thể tích **18 - 25 CBM**, cọc **2.000.000 VNĐ**, giá thuê **2.800.000 VNĐ/tháng**. Chứa hàng hóa pallet, thiết bị sự kiện, hồ sơ chứng từ lưu trữ lâu năm.
+
+---
+[DOCUMENT: Bang_Gia_Va_Goi_Thue]
+[SECTION: Chiet_Khau_Ky_Han_Dai_Han]
+Chính sách chiết khấu giảm giá trực tiếp theo kỳ hạn thanh toán (áp dụng cho cả Hợp đồng mới và Gia hạn):
+- Thuê hoặc gia hạn từ **3 tháng đến dưới 6 tháng**: **Giảm ngay 5%** trên tổng cước thuê.
+- Thuê hoặc gia hạn từ **6 tháng đến dưới 12 tháng**: **Giảm ngay 10%** trên tổng cước thuê.
+- Thuê hoặc gia hạn từ **12 tháng trở lên**: **Giảm ưu đãi cao nhất 15%** trên tổng cước thuê.
+*Lưu ý:* Tiền đặt cọc phòng kho **không nằm trong phạm vi giảm giá** và sẽ được **hoàn trả 100%** khi thanh lý hợp đồng.
+
+---
+[DOCUMENT: Chinh_Sach_Dat_Cho_Huy_Va_Hoan_Tien]
+[SECTION: Quy_Dinh_Giu_Cho_Va_Nop_Coc]
+1. **Đặt chỗ trước**: Khách hàng có thể đặt chỗ giữ phòng kho trước **tối đa 7 ngày** tính từ ngày gửi yêu cầu.
+2. **Thời hạn nộp cọc giữ chỗ**: Sau khi tạo đơn đặt chỗ (trạng thái **PENDING**), khách hàng có **15 phút** để hoàn tất thanh toán tiền cọc qua cổng trực tuyến VietQR/SePay.
+3. **Tự động hủy đơn quá hạn**: Nếu sau **15 phút** chưa nhận được thanh toán, hệ thống sẽ tự động chuyển đơn sang trạng thái **EXPIRED** (hết hạn) và **tự động giải phóng ngăn kho** để khách hàng khác có thể đặt.
+
+---
+[DOCUMENT: Chinh_Sach_Dat_Cho_Huy_Va_Hoan_Tien]
+[SECTION: Huy_Don_Va_Hoan_Tien_Coc]
+- Khách hàng có quyền chủ động **Hủy đặt chỗ (CANCEL)** khi đơn chưa bàn giao nhận kho thực tế (Check-in).
+- **Hủy trước lịch hẹn tối thiểu 24 giờ**: Tiền đặt cọc sẽ được **hoàn lại 100%** về tài khoản của khách hàng trong vòng **3 - 5 ngày làm việc**.
+- **Hủy gấp trong vòng 24 giờ** hoặc khách **không đến nhận kho (No-show)**: Phí giữ chỗ tương đương **50% tiền cọc** sẽ bị khấu trừ chi phí vận hành, phần còn lại được hoàn trả.
+- **Hợp đồng đã nhận kho (ACTIVE)**: Nếu muốn chấm dứt hợp đồng trước hạn, tiền cọc sẽ được đối soát khấu trừ tiền thuê thực tế và hoàn trả số dư khi hoàn tất bàn giao trả mặt bằng (Check-out).
+
+---
+[DOCUMENT: Phi_Qua_Han_Va_Khoa_Truy_Cap]
+[SECTION: Canh_Bao_Het_Han_Hop_Dong]
+- Hệ thống kích hoạt Cron Job quét tự động hàng ngày vào lúc **00:00** để phát hiện các hợp đồng sắp đến ngày kết thúc.
+- Thông báo nhắc gia hạn tự động được gửi tới khách hàng trước **7 ngày** và trước **3 ngày** qua Email, Thông báo ứng dụng (Notification) và SMS.
+- Khách hàng có thể dễ dàng gửi yêu cầu gia hạn (**Contract Renewal**) trực tiếp trên trang cá nhân hoặc qua trợ lý AI với các kỳ hạn **1, 3, 6, 12 tháng**.
+
+---
+[DOCUMENT: Phi_Qua_Han_Va_Khoa_Truy_Cap]
+[SECTION: Che_Tai_Qua_Han_Va_Khoa_Ma_PIN]
+1. **Thời điểm quá hạn**: Hợp đồng đến ngày kết thúc mà chưa gia hạn hoặc chưa trả kho sẽ tự động chuyển sang trạng thái **OVERDUE (Quá hạn)**.
+2. **Khóa quyền truy cập (Smart Lock)**: Mã số PIN của ổ khóa thông minh sẽ bị hệ thống chuyển sang **REVOKED (Tạm khóa)** ngay lập tức. Khách hàng không thể tự mở cửa kho cho đến khi thanh toán.
+3. **Công thức tính phí phạt quá hạn**:
+   - **Đơn giá thuê 1 ngày** = Tổng tiền thuê hàng tháng / 30 ngày.
+   - **Hệ số phạt trễ hạn** = **1.5 lần** đơn giá thuê ngày.
+   - **Tiền phạt quá hạn** = **(Đơn giá 1 ngày × 1.5) × Số ngày trễ hạn thực tế**.
+4. **Mở lại khóa kho**: Sau khi thanh toán xong khoản phạt hoặc được phê duyệt gia hạn mới, hệ thống tự động giải quyết bản ghi (**RESOLVED**) và **khôi phục mã PIN (ACTIVE)** ngay lập tức.
+
+---
+[DOCUMENT: Quy_Dinh_Do_Cam_Luu_Tru]
+[SECTION: Danh_Muc_Hang_Hoa_Cam]
+Nhằm đảm bảo an toàn PCCC và tuân thủ pháp luật, các mặt hàng sau **TUYỆT ĐỐI BỊ CẤM** lưu trữ:
+1. **Chất dễ cháy nổ**: Xăng, dầu hỏa, bình gas mini, pháo hoa, hóa chất công nghiệp dễ bốc cháy, dung môi hữu cơ.
+2. **Hàng quốc cấm, bất hợp pháp**: Vũ khí, súng đạn, công cụ hỗ trợ, ma túy, chất kích thích, tài liệu cấm.
+3. **Hàng tươi sống, thực phẩm bốc mùi**: Thịt cá tươi sống, rau củ quả không sấy khô, thực phẩm thu hút côn trùng.
+4. **Động vật sống và cây cảnh**: Nghiêm cấm nuôi nhốt bất kỳ thú cưng hoặc sinh vật sống nào trong kho.
+5. **Chất thải độc hại**: Pin axit chì rò rỉ, rác thải y tế, amiăng, hóa chất độc hại.
+*Vi phạm sẽ bị chấm dứt hợp đồng ngay lập tức, chuyển cơ quan chức năng và **không hoàn trả tiền cọc**.*
+
+---
+[DOCUMENT: Huong_Dan_Thanh_Toan_SePay]
+[SECTION: Phuong_Thuc_Va_Xac_Nhan_Tu_Dong]
+1. **Phương thức hỗ trợ**: Cổng thanh toán **VietQR tự động qua SePay**, hỗ trợ tất cả các ngân hàng Việt Nam (MBBank, Vietcombank, Techcombank, VPBank,...) và ví điện tử.
+2. **Quét mã VietQR**: Khi tạo đơn cọc hoặc thanh toán tiền thuê, màn hình sẽ hiển thị mã QR có sẵn số tiền và mã thanh toán duy nhất (**Payment Code**). Khách hàng chỉ cần quét mã và xác nhận.
+3. **Tự động kích hoạt**: Hệ thống nhận Webhook từ SePay và tự động xác nhận đơn thành công (**PAID**) trong vòng **3 - 10 giây** hoàn toàn tự động.
+4. **Xử lý sự cố**: Nếu quá **5 phút** chưa thấy cập nhật, khách hàng lưu ảnh biên lai chuyển khoản và gửi **Ticket Hỗ trợ (Flow 7)** để được kế toán kiểm tra thủ công.
+
+---
+[DOCUMENT: Huong_Dan_Su_Co_Va_Ho_Tro_Ky_Thuat]
+[SECTION: Xu_Ly_Su_Co_Khoa_Va_The_Tu]
+1. **Quên mã PIN mở kho**: Truy cập mục **'Hợp đồng của tôi'** trên hệ thống để xem lại mã PIN cấp riêng cho từng ngăn kho.
+2. **Khóa thông minh hết pin hoặc kẹt cơ**: Bấm nút **'Tạo yêu cầu hỗ trợ' (Support Request)** loại sự cố **LOCK** với mức ưu tiên **URGENT**. Nhân viên kỹ thuật sẽ có mặt xử lý trong vòng **15 phút**.
+3. **Mất thẻ từ hoặc chìa khóa phụ**: Báo ngay cho ban quản lý cơ sở để tạm thời hủy thẻ cũ đề phòng rủi ro mất cắp và làm thủ tục cấp lại thẻ mới.
+4. **Trích xuất camera an ninh**: Hệ thống trang bị **Camera CCTV 24/7** và nhật ký ra vào (**Access Log**). Khách hàng có thể yêu cầu trích xuất hình ảnh phục vụ kiểm tra qua Ticket Hỗ trợ mục **DAMAGE** hoặc **STORED_ITEMS**.

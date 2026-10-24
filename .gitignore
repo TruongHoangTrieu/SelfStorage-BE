@@ -55,3 +55,18 @@ Thumbs.db
 *.swp
 *.swo
 .expo/
+
+# Python / AI Service
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+ENV/
+.pytest_cache/
+.coverage
+htmlcov/
+*.joblib.bak
