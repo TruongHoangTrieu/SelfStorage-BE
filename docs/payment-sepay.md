@@ -1,3 +1,5 @@
+ 
+
 # Tích Hợp Thanh Toán (Payment) & Cổng Thanh Toán SePay (Flow 1 & Flow 2)
 
 Tài liệu này hướng dẫn chi tiết về luồng thanh toán tự động qua SePay (VietQR / Chuyển khoản ngân hàng) cho **Flow 1 (Đặt chỗ & Tiền cọc)** và **Flow 2 (Check-in & Tiền thuê còn lại)**.
@@ -9,10 +11,11 @@ Tài liệu này hướng dẫn chi tiết về luồng thanh toán tự động
 Hệ thống tích hợp SePay để tự động nhận diện giao dịch chuyển khoản ngân hàng thông qua Webhook, giúp cập nhật trạng thái đơn đặt chỗ từ `PENDING` sang `CONFIRMED` mà không cần nhân viên đối soát thủ công.
 
 ### Bảng phân định loại thanh toán (Payment Types)
-| Flow | Nghiệp vụ | Loại thanh toán (`paymentType`) | Số tiền tính toán | Trạng thái chuyển đổi |
-| :--- | :--- | :--- | :--- | :--- |
-| **Flow 1** | Đặt chỗ trực tuyến (Reservation Deposit) | `DEPOSIT` | Bằng tiền cọc (`depositAmount`) của loại kho | `Reservation: PENDING -> CONFIRMED`<br>`StorageUnit: RESERVED` |
-| **Flow 2** | Nhận kho & Bàn giao (Check-in Rental) | `RENTAL` | Bằng tiền thuê còn lại (`item.price * rentalPeriod`) - **KHÔNG tính lại tiền cọc** | `Payment: PAID`<br>`StorageUnit: OCCUPIED`<br>`Reservation: COMPLETED` |
+
+| Flow             | Nghiệp vụ                                   | Loại thanh toán (`paymentType`) | Số tiền tính toán                                                                                | Trạng thái chuyển đổi                                       |
+| :--------------- | :-------------------------------------------- | :---------------------------------- | :--------------------------------------------------------------------------------------------------- | :--------------------------------------------------------------- |
+| **Flow 1** | Đặt chỗ trực tuyến (Reservation Deposit) | `DEPOSIT`                         | Bằng tiền cọc (`depositAmount`) của loại kho                                                  | `Reservation: PENDING -> CONFIRMEDStorageUnit: RESERVED`       |
+| **Flow 2** | Nhận kho & Bàn giao (Check-in Rental)       | `RENTAL`                          | Bằng tiền thuê còn lại (`item.price * rentalPeriod`) - **KHÔNG tính lại tiền cọc** | `Payment: PAIDStorageUnit: OCCUPIED``Reservation: COMPLETED` |
 
 ---
 
@@ -82,10 +85,12 @@ Regex trích xuất trong Webhook: `/(SSDEP[A-Z0-9]+|SSREN[A-Z0-9]+)/i`
 ## 4. Đặc Tả Webhook & Cơ Chế Bảo Mật (SePay Webhook & Security)
 
 ### 4.1. Endpoint tiếp nhận
+
 * **URL**: `POST /payments/sepay/webhook`
 * **Xác thực**: Header `Authorization: Apikey <SEPAY_API_KEY>` hoặc `Authorization: Bearer <SEPAY_API_KEY>`.
 
 ### 4.2. Cấu trúc Payload từ SePay
+
 ```json
 {
   "id": 123456,
@@ -103,6 +108,7 @@ Regex trích xuất trong Webhook: `/(SSDEP[A-Z0-9]+|SSREN[A-Z0-9]+)/i`
 ```
 
 ### 4.3. Các lớp bảo vệ & Quy tắc kiểm tra (Security & Validation Rules)
+
 1. **Kiểm tra loại giao dịch**: Bỏ qua ngay các giao dịch tiền ra (`transferType === 'out'`).
 2. **Kiểm tra tính bất biến (Idempotency)**:
    - Nếu Payment đã ở trạng thái `PAID` $\rightarrow$ Trả về ngay `{"success": true, "message": "Payment already processed"}` mà không thực hiện ghi đè hoặc cộng dồn.
@@ -117,17 +123,21 @@ Regex trích xuất trong Webhook: `/(SSDEP[A-Z0-9]+|SSREN[A-Z0-9]+)/i`
 ## 5. Danh Sách API Thanh Toán
 
 ### 5.1. Tạo thanh toán tiền cọc (Flow 1)
+
 - **Method**: `POST`
 - **Endpoint**: `/payments/deposit`
 - **Auth**: `JwtAuthGuard` (Customer / Staff / Admin)
 - **Request Body**:
+
 ```json
 {
   "reservationId": 101,
   "paymentMethod": "BANK_TRANSFER"
 }
 ```
+
 - **Response Success (`201 Created`)**:
+
 ```json
 {
   "payment": {
@@ -155,10 +165,12 @@ Regex trích xuất trong Webhook: `/(SSDEP[A-Z0-9]+|SSREN[A-Z0-9]+)/i`
 ```
 
 ### 5.2. Tra cứu tổng hợp thanh toán của đơn đặt chỗ (Flow 2)
+
 - **Method**: `GET`
 - **Endpoint**: `/payments/reservations/:reservationId/summary`
 - **Auth**: `JwtAuthGuard`
 - **Response Success (`200 OK`)**:
+
 ```json
 {
   "reservationId": 101,
@@ -175,10 +187,12 @@ Regex trích xuất trong Webhook: `/(SSDEP[A-Z0-9]+|SSREN[A-Z0-9]+)/i`
 ```
 
 ### 5.3. Tạo thanh toán tiền thuê (Flow 2)
+
 - **Method**: `POST`
 - **Endpoint**: `/payments/rental`
 - **Auth**: `JwtAuthGuard`
 - **Request Body**:
+
 ```json
 {
   "reservationId": 101,
@@ -187,6 +201,7 @@ Regex trích xuất trong Webhook: `/(SSDEP[A-Z0-9]+|SSREN[A-Z0-9]+)/i`
 ```
 
 ### 5.4. Tiếp nhận SePay Webhook
+
 - **Method**: `POST`
 - **Endpoint**: `/payments/sepay/webhook`
 - **Auth**: Public (Xác thực qua header `Authorization: Apikey <SEPAY_API_KEY>`)
@@ -218,6 +233,7 @@ SEPAY_ACCOUNT_NAME=CONG TY CO PHAN SELF STORAGE
    - Gửi `POST /payments/deposit` với `reservationId: 1`. Nhận về `paymentCode` (ví dụ: `SSDEP1A2B3`).
 3. **Mô phỏng Webhook từ SePay**:
    - Gửi `POST /payments/sepay/webhook` với header `Authorization: Apikey your_sepay_api_key` và body:
+
    ```json
    {
      "id": 998811,

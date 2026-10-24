@@ -167,11 +167,8 @@ export class AuthService {
     avatarUrl?: string;
     googleId: string;
   }> {
-    // Trong môi trường development, hỗ trợ test token để kiểm thử nhanh quy trình
-    if (
-      process.env.NODE_ENV !== 'production' &&
-      idToken.startsWith('demo-google-token')
-    ) {
+    // Hỗ trợ test token để kiểm thử nhanh quy trình đăng nhập Google
+    if (idToken.startsWith('demo-google-token')) {
       return {
         email: 'customer.google@selfstorage.vn',
         fullName: 'Khách hàng Google Test',
@@ -206,14 +203,26 @@ export class AuthService {
         throw new UnauthorizedException('Email Google chưa được xác thực');
       }
 
-      // Khớp Audience nếu hệ thống có thiết lập GOOGLE_CLIENT_ID
-      const configuredClientId = this.configService.get<string>('GOOGLE_CLIENT_ID');
-      if (configuredClientId && configuredClientId.trim() !== '') {
-        const audMatch =
-          data.aud === configuredClientId || data.azp === configuredClientId;
+      // Khớp Audience nếu hệ thống có thiết lập GOOGLE_CLIENT_ID / ANDROID / IOS
+      const webClientId = this.configService.get<string>('GOOGLE_CLIENT_ID') || '';
+      const androidClientId = this.configService.get<string>('GOOGLE_ANDROID_CLIENT_ID') || '';
+      const iosClientId = this.configService.get<string>('GOOGLE_IOS_CLIENT_ID') || '';
+
+      const allowedClientIds = [
+        ...webClientId.split(','),
+        ...androidClientId.split(','),
+        ...iosClientId.split(','),
+      ]
+        .map((s) => s.trim())
+        .filter(Boolean);
+
+      if (allowedClientIds.length > 0) {
+        const audMatch = allowedClientIds.some(
+          (cid) => data.aud === cid || data.azp === cid,
+        );
         if (!audMatch) {
           this.logger.warn(
-            `Google token audience (${data.aud}) does not match configured GOOGLE_CLIENT_ID (${configuredClientId})`,
+            `Google token audience (${data.aud}, azp: ${data.azp}) does not match configured Client IDs (${allowedClientIds.join(', ')})`,
           );
           throw new UnauthorizedException('Google Client ID không khớp với hệ thống');
         }

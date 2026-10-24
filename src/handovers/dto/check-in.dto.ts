@@ -48,4 +48,8 @@ export class CheckInDto {
   @IsOptional()
   @IsString()
   identityBackUrl?: string;
+
+  @IsOptional()
+  @IsString({ message: 'unitCode must be a string' })
+  unitCode?: string;
 }

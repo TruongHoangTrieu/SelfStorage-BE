@@ -29,20 +29,44 @@ class GeminiProvider(LLMProvider):
 
     def generate(self, system: str, prompt: str, *, json_mode: bool = False,
                  temperature: float = 0.2) -> str | None:
+        import time
         from google.genai import types
 
-        try:
-            config = types.GenerateContentConfig(
-                system_instruction=system,
-                temperature=temperature,
-                response_mime_type="application/json" if json_mode else "text/plain",
-            )
-            resp = self._client.models.generate_content(
-                model=self._model, contents=prompt, config=config)
-            return resp.text
-        except Exception as e:  # noqa: BLE001 - lỗi mạng/hạn mức => fallback
-            logger.error("Gemini generate failed: %s", e)
-            return None
+        config = types.GenerateContentConfig(
+            system_instruction=system,
+            temperature=temperature,
+            response_mime_type="application/json" if json_mode else "text/plain",
+        )
+
+        # Danh sách các model hiện đại thử nghiệm theo thứ tự ưu tiên
+        # Ưu tiên model người dùng chọn -> Flash-Lite nhẹ/nhanh -> Flash Preview/Latest
+        candidate_models = [self._model]
+        modern_fallbacks = [
+            "gemini-3.8-flash",
+            "gemini-3.5-flash-lite",
+            "gemini-3.6-flash",
+            "gemini-3.1-flash-lite",
+            "gemini-3-flash-preview",
+            "gemini-flash-latest",
+            "gemini-flash-lite-latest",
+        ]
+        for fallback in modern_fallbacks:
+            if fallback not in candidate_models:
+                candidate_models.append(fallback)
+
+        for candidate in candidate_models:
+            try:
+                resp = self._client.models.generate_content(
+                    model=candidate, contents=prompt, config=config)
+                if resp and resp.text:
+                    return resp.text
+            except Exception as e:
+                err_msg = str(e)
+                logger.warning("Gemini model '%s' thất bại (%s), chuyển sang model tiếp theo...", candidate, err_msg)
+                continue
+
+        logger.info("⚠️ Tất cả các model Gemini trực tuyến đều quá tải/lỗi. Tự động kích hoạt cơ chế AI Local (Rule-based / Knowledge RAG)...")
+        return None
 
     def embed(self, texts: list[str]) -> list[list[float]] | None:
         try:

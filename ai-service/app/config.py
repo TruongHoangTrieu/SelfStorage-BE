@@ -31,7 +31,7 @@ class Settings(BaseSettings):
 
     llm_provider: str = "gemini"  # gemini | local
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-2.5-flash"
+    gemini_model: str = "gemini-3.8-flash"
     gemini_embedding_model: str = "gemini-embedding-001"
     llm_timeout_s: float = 20.0
 
