@@ -10,7 +10,11 @@ import {
   HttpCode,
   HttpStatus,
   ForbiddenException,
+  BadRequestException,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiTags,
   ApiOperation,
@@ -18,6 +22,7 @@ import {
   ApiBearerAuth,
   ApiQuery,
   ApiParam,
+  ApiConsumes,
 } from '@nestjs/swagger';
 import { FacilitiesService } from './facilities.service';
 import { CreateFacilityDto } from './dto/create-facility.dto';
@@ -107,8 +112,38 @@ export class FacilitiesController {
   async update(
     @Param('id') id: string,
     @Body() updateFacilityDto: UpdateFacilityDto,
+    @CurrentUser() user: any,
   ) {
+    await this.facilitiesService.verifyManagerFacilityScope(user, id);
     return this.facilitiesService.update(id, updateFacilityDto);
+  }
+
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Tải ảnh cơ sở kho lên Cloudinary (Admin / Giám đốc vận hành / Quản lý cơ sở)' })
+  @ApiParam({ name: 'id', description: 'ID cơ sở kho' })
+  @ApiConsumes('multipart/form-data')
+  @ApiResponse({ status: 200, description: 'Tải ảnh lên Cloudinary và cập nhật cơ sở thành công' })
+  @UseGuards(RolesGuard)
+  @Roles(
+    UserRole.FACILITY_MANAGER,
+    UserRole.BUSINESS_OPERATIONS_MANAGER,
+    UserRole.SYSTEM_ADMINISTRATOR,
+  )
+  @UseInterceptors(FileInterceptor('image'))
+  @Post(':id/upload-image')
+  async uploadImage(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+    @CurrentUser() user: any,
+    @Body('isPrimary') isPrimary?: string | boolean,
+    @Body('slotIndex') slotIndex?: string | number,
+  ) {
+    if (!file) {
+      throw new BadRequestException('Vui lòng chọn tệp hình ảnh để tải lên');
+    }
+    const isPrimaryBool = isPrimary === 'false' || isPrimary === false ? false : true;
+    const slotNum = slotIndex !== undefined && slotIndex !== null && slotIndex !== '' ? Number(slotIndex) : undefined;
+    return this.facilitiesService.uploadFacilityImage(id, file, user, isPrimaryBool, slotNum);
   }
 
   // ==================== FLOW 5: QUẢN LÝ NHÂN VIÊN ====================

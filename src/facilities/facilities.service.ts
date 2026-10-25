@@ -3,8 +3,11 @@ import {
   NotFoundException,
   ConflictException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
+import { CloudinaryService } from '../common/cloudinary/cloudinary.service';
+import { UserRole } from '../common/enums/role.enum';
 import { CreateFacilityDto } from './dto/create-facility.dto';
 import { UpdateFacilityDto } from './dto/update-facility.dto';
 import { AssignStaffDto, EndStaffAssignmentDto } from './dto/assign-staff.dto';
@@ -12,7 +15,10 @@ import { FacilityStatus, StorageUnitStatus, PolicyStatus, ReservationStatus } fr
 
 @Injectable()
 export class FacilitiesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cloudinaryService: CloudinaryService,
+  ) {}
 
   async findAll() {
     const facilities = await this.prisma.facility.findMany({
@@ -196,6 +202,115 @@ export class FacilitiesService {
         status: dto.status || undefined,
       },
     });
+  }
+
+  /**
+   * Kiểm tra quyền quản lý chi nhánh:
+   * - SYSTEM_ADMINISTRATOR & BUSINESS_OPERATIONS_MANAGER: Toàn quyền với mọi cơ sở kho.
+   * - FACILITY_MANAGER: Chỉ được quyền thao tác đúng chi nhánh được phân công.
+   */
+  async verifyManagerFacilityScope(user: any, facilityId: string): Promise<void> {
+    if (!user) {
+      throw new ForbiddenException('Yêu cầu xác thực tài khoản');
+    }
+
+    const role = user.role;
+    if (
+      role === UserRole.SYSTEM_ADMINISTRATOR ||
+      role === UserRole.BUSINESS_OPERATIONS_MANAGER ||
+      role === 'ADMIN'
+    ) {
+      return; // Toàn quyền
+    }
+
+    if (role === UserRole.FACILITY_MANAGER) {
+      // 1. Kiểm tra trực tiếp facilityId gắn trên user profile hoặc token
+      if (user.facilityId && (user.facilityId === facilityId || String(user.facilityId) === String(facilityId))) {
+        return;
+      }
+
+      // 2. Tra cứu trong bảng StaffFacilityAssignment để đảm bảo chính xác
+      const userId = user.id || user.sub;
+      if (userId) {
+        const assignment = await this.prisma.staffFacilityAssignment.findFirst({
+          where: {
+            userId,
+            facilityId,
+            endedAt: null,
+          },
+        });
+        if (assignment) {
+          return;
+        }
+      }
+
+      throw new ForbiddenException(
+        'Bạn chỉ có quyền quản lý và cập nhật hình ảnh của chi nhánh bạn được phân công phụ trách!',
+      );
+    }
+
+    throw new ForbiddenException('Bạn không có quyền thực hiện thao tác này trên cơ sở kho');
+  }
+
+  /**
+   * Tải ảnh cơ sở kho lên Cloudinary và cập nhật mảng images của cơ sở
+   */
+  async uploadFacilityImage(
+    facilityId: string,
+    file: Express.Multer.File,
+    user: any,
+    isPrimary: boolean = true,
+    slotIndex?: number,
+  ) {
+    // 1. Kiểm tra quyền chi nhánh
+    await this.verifyManagerFacilityScope(user, facilityId);
+
+    // 2. Kiểm tra cơ sở kho tồn tại
+    const facility = await this.prisma.facility.findUnique({
+      where: { id: facilityId },
+    });
+    if (!facility) {
+      throw new NotFoundException(`Không tìm thấy cơ sở kho với mã ID: ${facilityId}`);
+    }
+
+    // 3. Upload ảnh lên Cloudinary thư mục 'facilities'
+    const uploadResult = await this.cloudinaryService.uploadImage(file, 'facilities');
+    const newImageUrl = uploadResult.url;
+
+    // 4. Cập nhật mảng images
+    const currentImages = Array.isArray(facility.images) ? [...facility.images] : [];
+    let updatedImages: string[];
+
+    if (slotIndex !== undefined && !isNaN(slotIndex) && slotIndex >= 0) {
+      updatedImages = [...currentImages];
+      while (updatedImages.length <= slotIndex) {
+        updatedImages.push('');
+      }
+      updatedImages[slotIndex] = newImageUrl;
+    } else if (isPrimary) {
+      // Đưa ảnh mới lên làm ảnh đại diện chính (images[0])
+      const remaining = currentImages.filter((img) => img !== newImageUrl);
+      updatedImages = [newImageUrl, ...remaining];
+    } else {
+      // Thêm vào danh sách ảnh thư viện
+      if (!currentImages.includes(newImageUrl)) {
+        updatedImages = [...currentImages, newImageUrl];
+      } else {
+        updatedImages = currentImages;
+      }
+    }
+
+    const updatedFacility = await (this.prisma.facility.update as any)({
+      where: { id: facilityId },
+      data: { images: updatedImages },
+    });
+
+    return {
+      message: 'Tải và cập nhật ảnh cơ sở kho lên Cloudinary thành công',
+      url: newImageUrl,
+      images: updatedImages,
+      facility: updatedFacility,
+    };
   }
 
   // ==================== FLOW 5: STAFF MANAGEMENT ====================

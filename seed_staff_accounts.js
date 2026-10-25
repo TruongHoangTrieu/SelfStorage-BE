@@ -8,9 +8,10 @@ async function main() {
 
   const staffRole = await prisma.role.findUnique({ where: { name: 'FACILITY_STAFF' } });
   const managerRole = await prisma.role.findUnique({ where: { name: 'FACILITY_MANAGER' } });
+  const opsRole = await prisma.role.findUnique({ where: { name: 'BUSINESS_OPERATIONS_MANAGER' } });
   const customerRole = await prisma.role.findUnique({ where: { name: 'STORAGE_CUSTOMER' } });
 
-  if (!staffRole || !managerRole) {
+  if (!staffRole || !managerRole || !opsRole) {
     console.error('Roles not found!');
     return;
   }
@@ -93,6 +94,22 @@ async function main() {
       facilityIndex: 1, // An Phú
       roleId: managerRole.id,
       position: 'Quản lý cơ sở kho An Phú',
+    },
+    {
+      email: 'ops@selfstorage.vn',
+      fullName: 'Nguyễn Vận Hành (Giám Đốc Vận Hành)',
+      phone: '0908889999',
+      facilityIndex: 0, // Trụ sở chính Thủ Đức
+      roleId: opsRole.id,
+      position: 'Giám Đốc Vận Hành Toàn Chuỗi',
+    },
+    {
+      email: 'giamdoc.vanhanh@selfstorage.vn',
+      fullName: 'Trần Quốc Bảo (Giám Đốc Vận Hành)',
+      phone: '0909998888',
+      facilityIndex: 0, // Trụ sở chính Thủ Đức
+      roleId: opsRole.id,
+      position: 'Giám Đốc Vận Hành Toàn Chuỗi',
     },
   ];
 
