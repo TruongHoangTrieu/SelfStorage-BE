@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from ..config import get_settings
 from ..llm import get_llm
 from ..nest_client import get_nest
+from ..nlp.text import find_prohibited_mentions
 from .item_extractor import ResolvedItem, extract_items
 
 logger = logging.getLogger(__name__)
@@ -102,6 +103,27 @@ def generate_explanation(
 
 def handle_size_advice(message: str, facility_id: str | None = None) -> SizeAdviceResult:
     s = get_settings()
+
+    # 1. Guardrail kiểm tra hàng cấm lưu trữ
+    prohibited = find_prohibited_mentions(message)
+    if prohibited:
+        prohibited_str = ", ".join(f"**{p}**" for p in prohibited)
+        reply = (
+            f"⚠️ **CẢNH BÁO AN TOÀN - HÀNG CẤM LƯU TRỮ:**\n\n"
+            f"Trong mô tả của bạn có chứa mặt hàng: {prohibited_str}.\n\n"
+            f"Theo **Quy định PCCC & Điều khoản dịch vụ Kho Tự Quản**, các mặt hàng dễ cháy nổ, nhiên liệu, vũ khí, động vật sống và thực phẩm tươi sống **TUYỆT ĐỐI BỊ CẤM** lưu trữ tại hệ thống nhằm bảo vệ an toàn cho toàn bộ kho bãi.\n\n"
+            f"🚫 Hệ thống **từ chối tư vấn** lưu trữ cho các mặt hàng trên. Nếu bạn có các vật dụng dân dụng an toàn khác (bàn ghế, tủ lạnh, quần áo, thùng tài liệu...), vui lòng mô tả lại để tôi hỗ trợ nhé!"
+        )
+        return SizeAdviceResult(
+            items=[],
+            total_raw_volume_m3=0.0,
+            aisle_factor=s.aisle_factor,
+            required_volume_m3=0.0,
+            suggested_units=[],
+            reply=reply,
+            method="prohibited_guardrail",
+        )
+
     resolved_items, method = extract_items(message)
 
     if not resolved_items:

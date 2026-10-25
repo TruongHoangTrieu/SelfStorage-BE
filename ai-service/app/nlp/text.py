@@ -41,3 +41,32 @@ def mask_pii(text: str) -> str:
     text = _PHONE.sub("[SĐT]", text)
     text = _ID_NUMBER.sub("[SỐ GIẤY TỜ]", text)
     return text
+
+
+PROHIBITED_CATEGORIES = {
+    "Chất dễ cháy nổ & nhiên liệu": [
+        "xang", "dau hoa", "binh gas", "binh ga", "gas mini", "phao hoa", "phao no",
+        "thuoc sung", "con 90", "con y te", "axit", "chat de chay", "xang dau", "dau diesel"
+    ],
+    "Vũ khí & Hàng cấm pháp luật": [
+        "vu khi", "sung ban", "khau sung", "sung dan", "dan duoc", "dao gam", "ma tuy", "chat cam", "thuoc phien", "can sa", "hang lau"
+    ],
+    "Động vật sống & Thú cưng": [
+        "con cho", "con meo", "thu cung", "chim canh", "dong vat", "dong vat song", "thu nuoi", "nuoi thu", "cho meo"
+    ],
+    "Hàng tươi sống & Thực phẩm ôi thiu": [
+        "thit song", "ca song", "hai san tuoi", "thuc pham tuoi", "do tuoi song", "rau cu song", "rac thai"
+    ]
+}
+
+
+def find_prohibited_mentions(text: str) -> list[str]:
+    """Phát hiện các mặt hàng nằm trong danh mục cấm lưu trữ an toàn PCCC."""
+    norm = normalize(text)
+    detected = []
+    for cat, kws in PROHIBITED_CATEGORIES.items():
+        for kw in kws:
+            pattern = rf"(?:\b|^){re.escape(kw)}(?:\b|$)"
+            if re.search(pattern, norm):
+                detected.append(f"{kw} ({cat})")
+    return list(dict.fromkeys(detected))

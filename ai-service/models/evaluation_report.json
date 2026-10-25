@@ -20,53 +20,53 @@
       6,
       12
     ],
-    "created_at": "2026-10-22T08:53:28.630428"
+    "created_at": "2026-10-25T16:09:22.665733"
   },
   "model_a_renewal": {
     "baseline_majority": {
-      "accuracy": 0.6466666666666666,
-      "f1": 0.0
+      "accuracy": 0.55,
+      "f1": 0.7096774193548387
     },
     "baseline_logistic_regression": {
-      "accuracy": 0.8488888888888889,
-      "precision": 0.837037037037037,
-      "recall": 0.710691823899371,
-      "f1": 0.7687074829931972,
-      "roc_auc": 0.9217186453132766
+      "accuracy": 0.945,
+      "precision": 0.9569230769230769,
+      "recall": 0.9424242424242424,
+      "f1": 0.9496183206106871,
+      "roc_auc": 0.9928843995510662
     },
     "main_xgboost": {
-      "accuracy": 0.8622222222222222,
-      "precision": 0.8592592592592593,
-      "recall": 0.7295597484276729,
-      "f1": 0.7891156462585034,
-      "roc_auc": 0.9331733990360717,
-      "cv_roc_auc_mean": 0.8975093682411949,
-      "cv_roc_auc_std": 0.009040839694050689
+      "accuracy": 0.9483333333333334,
+      "precision": 0.96,
+      "recall": 0.9454545454545454,
+      "f1": 0.9526717557251908,
+      "roc_auc": 0.9926374859708194,
+      "cv_roc_auc_mean": 0.9903980562285174,
+      "cv_roc_auc_std": 0.0010237347879069234
     },
     "feature_importance": {
-      "late_payments_count": 0.2234150618314743,
-      "access_count_last_30d": 0.12611885368824005,
-      "overdue_fees_count": 0.11161229759454727,
-      "has_discount": 0.10621234029531479,
-      "days_since_last_access": 0.1014891266822815,
-      "rented_months": 0.08779130131006241,
-      "unit_size_m2": 0.07413192093372345,
-      "month_of_year": 0.06019650399684906,
-      "price_per_m2_ratio": 0.05093737691640854,
-      "facility_occupancy_rate": 0.029787525534629822,
-      "support_tickets_count": 0.028307607397437096
+      "late_payments_count": 0.32489970326423645,
+      "overdue_fees_count": 0.32045844197273254,
+      "days_since_last_access": 0.09177899360656738,
+      "access_count_last_30d": 0.08661603927612305,
+      "support_tickets_count": 0.06897846609354019,
+      "has_discount": 0.031186891719698906,
+      "price_per_m2_ratio": 0.019378025084733963,
+      "unit_size_m2": 0.018145957961678505,
+      "rented_months": 0.015817778185009956,
+      "month_of_year": 0.013781947083771229,
+      "facility_occupancy_rate": 0.008957778103649616
     }
   },
   "model_b_package": {
     "baseline_size_heuristic": {
-      "accuracy": 0.4311111111111111,
-      "macro_f1": 0.2567055434356995
+      "accuracy": 0.6416666666666667,
+      "macro_f1": 0.32624198344157296
     },
     "main_random_forest": {
-      "accuracy": 0.6066666666666667,
-      "macro_f1": 0.36635264632168657,
-      "cv_accuracy_mean": 0.628235294117647,
-      "cv_accuracy_std": 0.013275537944949616
+      "accuracy": 0.8533333333333334,
+      "macro_f1": 0.5639022756076494,
+      "cv_accuracy_mean": 0.851764705882353,
+      "cv_accuracy_std": 0.008182604554849156
     }
   }
 }

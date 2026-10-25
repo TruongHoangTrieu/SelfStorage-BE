@@ -33,14 +33,20 @@ from .generate_dataset import FEATURE_COLUMNS, generate_synthetic_data
 
 
 def train_and_evaluate(data_path: Path | None = None, models_dir: Path | None = None) -> dict:
+    service_root = Path(__file__).resolve().parent.parent.parent
     if models_dir is None:
-        models_dir = Path(__file__).resolve().parent.parent / "models"
+        models_dir = service_root / "models"
     models_dir.mkdir(parents=True, exist_ok=True)
+
+    if data_path is None:
+        default_csv = service_root / "data" / "synthetic_contracts.csv"
+        if default_csv.exists():
+            data_path = default_csv
 
     if data_path and data_path.exists():
         df = pd.read_csv(data_path)
     else:
-        df = generate_synthetic_data(n_samples=3000, random_seed=42)
+        df = generate_synthetic_data(n_samples=4000, random_seed=42)
 
     X = df[FEATURE_COLUMNS].copy()
     y_renew = df["will_renew"].values

@@ -78,7 +78,7 @@ def test_skill_3_prediction_logic():
     assert result.probability_tier in ["CAO", "TRUNG_BINH", "THAP"]
 
 
-def test_router_5_branches():
+def test_router_7_branches():
     r1 = route_with_rules("Tôi có 1 máy giặt và 10 thùng đồ cần thuê kho cỡ nào?")
     assert r1.intent == "size_advice"
 
@@ -93,3 +93,63 @@ def test_router_5_branches():
 
     r5 = route_with_rules("Xin chào bạn là ai")
     assert r5.intent == "out_of_scope"
+
+    # Tình huống Xấu 1: Hàng cấm PCCC
+    r6 = route_with_rules("Tôi có 2 can xăng và 5 thùng pháo hoa muốn thuê kho cất")
+    assert r6.intent == "prohibited_items"
+
+    # Tình huống Xấu 2: Sự cố khẩn cấp / Hỏng khóa / Ngập nước
+    r7 = route_with_rules("Kho của tôi bị ngập nước ướt hết đồ rồi, gọi hotline khẩn cấp cho ai?")
+    assert r7.intent == "emergency_support"
+
+
+def test_prohibited_items_guardrail_in_size_advice():
+    # Khi khách hỏi tư vấn kích thước nhưng lồng ghép hàng cấm
+    res = handle_size_advice("Tôi cần kho chứa 5 can xăng và 2 xe máy")
+    assert res.method == "prohibited_guardrail"
+    assert "CẢNH BÁO AN TOÀN" in res.reply
+    assert len(res.suggested_units) == 0  # Tuyệt đối không gợi ý phòng kho cho hàng cấm
+
+
+def test_bad_customer_high_churn_risk():
+    # Tình huống Xấu: Khách hàng nợ cước nhiều lần, khiếu nại nhiều, bỏ quên kho
+    bad_features = {
+        "contractId": "bad_contract_001",
+        "rented_months": 2,
+        "unit_size_m2": 2.0,
+        "price_per_m2_ratio": 1.30,
+        "late_payments_count": 4,
+        "overdue_fees_count": 3,
+        "access_count_last_30d": 0,
+        "days_since_last_access": 55,
+        "support_tickets_count": 3,
+        "has_discount": 0,
+        "month_of_year": 3,
+        "facility_occupancy_rate": 0.70,
+    }
+    result = predict_single_contract(bad_features)
+    assert result.probability_tier == "THAP"
+    assert result.action == "FLAG_STAFF_CONTACT"
+    assert result.renewal_probability < 0.40
+
+
+def test_good_customer_vip_high_retention():
+    # Tình huống Tốt: Khách VIP thuê kho lớn lâu năm, không trễ hạn, ra vào thường xuyên
+    vip_features = {
+        "contractId": "vip_contract_999",
+        "rented_months": 24,
+        "unit_size_m2": 18.0,
+        "price_per_m2_ratio": 0.90,
+        "late_payments_count": 0,
+        "overdue_fees_count": 0,
+        "access_count_last_30d": 15,
+        "days_since_last_access": 1,
+        "support_tickets_count": 0,
+        "has_discount": 1,
+        "month_of_year": 12,
+        "facility_occupancy_rate": 0.95,
+    }
+    result = predict_single_contract(vip_features)
+    assert result.probability_tier == "CAO"
+    assert result.renewal_probability >= 0.70
+    assert result.recommended_package in [6, 12]  # Khách VIP luôn được đề xuất gói dài hạn tiết kiệm

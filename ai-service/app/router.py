@@ -1,9 +1,11 @@
-"""Router phân loại ý định người dùng thành 1 trong 5 nhánh:
-1. size_advice: Tư vấn chọn cỡ kho từ danh sách đồ đạc.
-2. search_policy: Hỏi đáp chính sách, hủy, hoàn tiền, phí phạt, đồ cấm, quy định.
-3. recommend_package: Hỏi nên gia hạn gói nào, gợi ý kỳ hạn hợp đồng.
-4. get_live_data: Tra cứu hợp đồng hiện tại của chính khách hàng, kiểm tra kho trống.
-5. out_of_scope: Ngoài phạm vi hoặc câu hỏi không rõ ràng.
+"""Router phân loại ý định người dùng thành 1 trong 7 nhánh:
+1. prohibited_items: Cảnh báo hàng cấm, chất cháy nổ, vũ khí, động vật sống (Tình huống Xấu 1 - An toàn PCCC).
+2. emergency_support: Xử lý sự cố khẩn cấp, cháy nổ, ngập nước, kẹt khóa cửa, khiếu nại đền bù (Tình huống Xấu 2).
+3. size_advice: Tư vấn chọn cỡ kho từ danh sách đồ đạc (Tình huống Tốt / Nhu cầu cơ bản).
+4. search_policy: Hỏi đáp chính sách, cọc, hoàn tiền, phạt quá hạn, bảo hiểm, ưu đãi doanh nghiệp.
+5. recommend_package: Hỏi nên gia hạn gói nào, gợi ý kỳ hạn hợp đồng (1, 3, 6, 12 tháng qua Model B).
+6. get_live_data: Tra cứu hợp đồng hiện tại của khách, kiểm tra danh sách kho trống thực tế.
+7. out_of_scope: Chào hỏi, câu hỏi mập mờ hoặc ngoài phạm vi kho lưu trữ.
 """
 from __future__ import annotations
 
@@ -14,16 +16,26 @@ from pydantic import BaseModel
 
 from .config import get_settings
 from .llm import get_llm
-from .nlp.text import mask_pii, normalize
+from .nlp.text import find_prohibited_mentions, mask_pii, normalize
 
 logger = logging.getLogger(__name__)
 
 INTENTS = [
+    "prohibited_items",
+    "emergency_support",
     "size_advice",
     "search_policy",
     "recommend_package",
     "get_live_data",
     "out_of_scope",
+]
+
+_EMERGENCY_KEYWORDS = [
+    "chay kho", "hoa hoan", "ngap nuoc", "uot het do", "dot nhap", "trom cap", "mat trom",
+    "mat do", "bi mat cap", "mat tai san", "khoa khong mo duoc", "ket khoa", "ma pin loi",
+    "khong the vao lay do", "khan cap", "can lay do ngay", "khong mo duoc cua",
+    "toi muon kien", "tai sao tru tien", "lua dao", "gap quan ly", "gap giam doc",
+    "den bu", "boi thuong", "kieu nai", "hotline", "su co", "hu hong kho", "goi cuu ho",
 ]
 
 _SIZE_KEYWORDS = [
@@ -40,7 +52,8 @@ _POLICY_KEYWORDS = [
     "hu hong", "gio mo cua", "ra vao kho", "camera", "bao ve", "giam gia", "chiet khau",
     "gia thue", "bang gia", "gia ca", "bao nhieu tien", "chi phi", "gia kho", "tien thue",
     "cuoc thue", "don gia", "gia bao nhieu", "bang bao gia", "bieu phi", "muc gia", "gia thue kho",
-    "thue bao nhieu", "gia",
+    "thue bao nhieu", "gia", "bao hiem", "boi thuong", "doanh nghiep", "cong ty", "hoa don vat",
+    "thue si", "thue nhieu kho", "xe nang", "pallet",
 ]
 
 _RENEWAL_KEYWORDS = [
@@ -62,12 +75,14 @@ class RouteDecision(BaseModel):
 
 _ROUTER_SYSTEM = (
     "Bạn là bộ phân loại ý định (Intent Router) cho hệ thống Kho Tự Quản (SelfStorage). "
-    "Nhiệm vụ: Đọc tin nhắn mới nhất và lịch sử hội thoại, phân loại chính xác vào 1 trong 5 intent:\n"
-    "1. 'size_advice': Khách nêu hoặc hỏi về đồ đạc cần lưu trữ và muốn tư vấn cỡ kho/thể tích phù hợp.\n"
-    "2. 'search_policy': Khách hỏi về chính sách, điều khoản, hủy cọc, hoàn tiền, phạt quá hạn, đồ cấm, hướng dẫn thanh toán, an toàn.\n"
-    "3. 'recommend_package': Khách hàng đang có hợp đồng muốn hỏi nên chọn gói gia hạn nào (1, 3, 6, 12 tháng) hoặc ưu đãi gia hạn.\n"
-    "4. 'get_live_data': Khách hỏi tình trạng kho trống thực tế, tra cứu hợp đồng của chính mình, thời hạn còn lại.\n"
-    "5. 'out_of_scope': Chào hỏi xã giao, câu hỏi không liên quan (thời tiết, nấu ăn, toán học...) hoặc chưa rõ ý.\n\n"
+    "Nhiệm vụ: Đọc tin nhắn mới nhất và phân loại chính xác vào 1 trong 7 intent:\n"
+    "1. 'prohibited_items': Khách muốn lưu trữ hoặc hỏi gửi hàng cấm, chất cháy nổ (xăng, dầu, gas, pháo), vũ khí, động vật sống, thực phẩm tươi sống.\n"
+    "2. 'emergency_support': Sự cố khẩn cấp (cháy, ngập nước, mất cắp, kẹt khóa cửa khẩn cấp, bức xúc muốn khiếu nại, đòi đền bù).\n"
+    "3. 'size_advice': Khách nêu hoặc hỏi về đồ đạc cần lưu trữ và muốn tư vấn cỡ kho/thể tích phù hợp.\n"
+    "4. 'search_policy': Khách hỏi về chính sách, điều khoản, hủy cọc, hoàn tiền, phạt quá hạn, bảo hiểm, ưu đãi doanh nghiệp.\n"
+    "5. 'recommend_package': Khách hàng đang có hợp đồng muốn hỏi nên chọn gói gia hạn nào (1, 3, 6, 12 tháng) hoặc ưu đãi gia hạn.\n"
+    "6. 'get_live_data': Khách hỏi tình trạng kho trống thực tế, tra cứu hợp đồng của chính mình, thời hạn còn lại.\n"
+    "7. 'out_of_scope': Chào hỏi xã giao, câu hỏi quá ngắn mập mờ (vd: 'kho', 'thuê kho'), hoặc không liên quan.\n\n"
     "Trả về DUY NHẤT một chuỗi JSON: {\"intent\": \"...\", \"confidence\": 0.0 - 1.0, \"reason\": \"...\"}"
 )
 
@@ -75,7 +90,25 @@ _ROUTER_SYSTEM = (
 def route_with_rules(message: str) -> RouteDecision:
     text = normalize(message)
 
-    # Ưu tiên kiểm tra size advice nếu có từ khóa đồ vật cụ thể
+    # 1. ƯU TIÊN CAO NHẤT: Kiểm tra hàng cấm (Tình huống Xấu 1)
+    prohibited = find_prohibited_mentions(message)
+    if prohibited:
+        return RouteDecision(
+            intent="prohibited_items",
+            confidence=0.98,
+            reason=f"Phát hiện hàng cấm PCCC: {', '.join(prohibited)}",
+        )
+
+    # 2. ƯU TIÊN THỨ HAI: Sự cố khẩn cấp & khiếu nại (Tình huống Xấu 2)
+    emergency_hits = sum(1 for kw in _EMERGENCY_KEYWORDS if kw in text)
+    if emergency_hits > 0:
+        return RouteDecision(
+            intent="emergency_support",
+            confidence=min(0.75 + 0.1 * emergency_hits, 0.98),
+            reason=f"Phát hiện sự cố khẩn cấp hoặc khiếu nại nghiêm trọng (hits={emergency_hits})",
+        )
+
+    # 3. Phân loại các nhóm nghiệp vụ thông thường
     size_hits = sum(1 for kw in _SIZE_KEYWORDS if kw in text)
     policy_hits = sum(1 for kw in _POLICY_KEYWORDS if kw in text)
     renewal_hits = sum(1 for kw in _RENEWAL_KEYWORDS if kw in text)
@@ -113,9 +146,14 @@ def route_with_rules(message: str) -> RouteDecision:
 
 
 def route_message(message: str, history: list[dict[str, str]] | None = None) -> RouteDecision:
+    # 1. Luôn chạy bộ lọc hàng cấm & khẩn cấp bằng rule-based trước để đảm bảo an toàn tuyệt đối
+    quick_rule = route_with_rules(message)
+    if quick_rule.intent in ["prohibited_items", "emergency_support"]:
+        return quick_rule
+
     llm = get_llm()
     if not llm.available:
-        return route_with_rules(message)
+        return quick_rule
 
     # Tạo prompt với ngữ cảnh các lượt gần nhất
     s = get_settings()
@@ -138,4 +176,4 @@ def route_message(message: str, history: list[dict[str, str]] | None = None) -> 
                 reason=str(data.get("reason", "Phân loại bởi LLM Router")),
             )
 
-    return route_with_rules(message)
+    return quick_rule

@@ -163,8 +163,40 @@ def chat_endpoint(
     data: dict[str, Any] = {}
     sources: list[str] = []
 
+    # ================= 0. Nhánh: prohibited_items (Tình huống Xấu 1 - PCCC) =================
+    if intent == "prohibited_items":
+        from .nlp.text import find_prohibited_mentions
+        prohibited = find_prohibited_mentions(req.message)
+        prohibited_str = ", ".join(f"**{p}**" for p in prohibited) if prohibited else "**Hàng cấm / Chất nguy hiểm**"
+        reply = (
+            f"🚫 **CẢNH BÁO AN TOÀN - TỪ CHỐI LƯU TRỮ:**\n\n"
+            f"Hệ thống phát hiện yêu cầu của bạn có liên quan đến: {prohibited_str}.\n\n"
+            f"Theo **Nghị định PCCC & Điều khoản Dịch vụ Kho Tự Quản**:\n"
+            f"• **TUYỆT ĐỐI CẤM** lưu trữ các chất dễ cháy nổ (xăng, dầu, gas, pháo hoa, hóa chất), vũ khí, động vật sống và thực phẩm tươi sống dễ ôi thiu.\n"
+            f"• **Chế tài xử lý:** Vi phạm sẽ bị **chấm dứt hợp đồng ngay lập tức**, **khấu trừ 100% tiền đặt cọc**, đồng thời chuyển hồ sơ sang cơ quan chức năng có thẩm quyền xử lý theo pháp luật.\n\n"
+            f"💡 *Vui lòng chỉ lưu trữ các đồ dùng gia đình, thiết bị điện tử, nội thất và hàng hóa khô ráo an toàn!*"
+        )
+        sources = ["Quy_Dinh_Do_Cam_Luu_Tru: Danh_Muc_Hang_Hoa_Cam"]
+        data = {"prohibited_items": prohibited, "status": "REJECTED"}
+
+    # ================= 0. Nhánh: emergency_support (Tình huống Xấu 2 - Khẩn cấp / Khiếu nại) =================
+    elif intent == "emergency_support":
+        reply = (
+            "🚨 **TRUNG TÂM TIẾP NHẬN SỰ CỐ KHẨN CẤP 24/7**\n\n"
+            "Chúng tôi rất tiếc vì sự cố bạn đang gặp phải! Để xử lý nhanh nhất và bảo vệ tài sản của bạn, vui lòng thực hiện ngay:\n\n"
+            "1. 📞 **GỌI HOTLINE KHẨN CẤP:** **1900 6868** (Nhánh số **1** - Kỹ thuật trực 24/7 giải quyết trong **15 phút**).\n"
+            "2. 📱 **TẠO TICKET HỖ TRỢ ƯU TIÊN:** Vào mục **'Hỗ trợ'** trên ứng dụng -> Tạo yêu cầu loại **LOCK** (sự cố khóa) hoặc **DAMAGE** (sự cố ẩm mốc/hư hại) -> Chọn mức ưu tiên **URGENT**.\n"
+            "3. 🛡️ **CHÍNH SÁCH BẢO HIỂM & ĐỀN BÙ:** Mỗi ngăn kho được bảo hiểm tự động lên tới **50.000.000 VNĐ**. Quý khách vui lòng chụp ảnh/quay video hiện trường để được giám định bồi thường trong vòng **48 giờ**.\n\n"
+            "👉 *Đội ngũ kỹ thuật và bảo vệ tại cơ sở đã được thông báo để hỗ trợ bạn ngay lập tức!*"
+        )
+        sources = [
+            "Huong_Dan_Su_Co_Va_Ho_Tro_Ky_Thuat: Xu_Ly_Su_Co_Khoa_Va_The_Tu",
+            "Bao_Hiem_Va_Boi_Thuong_Thiet_Hai: Xu_Ly_Su_Co_Khan_Cap_Va_Bao_Hiem",
+        ]
+        data = {"hotline": "1900 6868", "priority": "URGENT"}
+
     # ================= 1. Nhánh: size_advice =================
-    if intent == "size_advice":
+    elif intent == "size_advice":
         res = handle_size_advice(req.message, facility_id=req.facility_id)
         reply = res.reply
         data = {

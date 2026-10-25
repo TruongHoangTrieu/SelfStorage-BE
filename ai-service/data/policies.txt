@@ -79,3 +79,24 @@ Nhằm đảm bảo an toàn PCCC và tuân thủ pháp luật, các mặt hàng
 2. **Khóa thông minh hết pin hoặc kẹt cơ**: Bấm nút **'Tạo yêu cầu hỗ trợ' (Support Request)** loại sự cố **LOCK** với mức ưu tiên **URGENT**. Nhân viên kỹ thuật sẽ có mặt xử lý trong vòng **15 phút**.
 3. **Mất thẻ từ hoặc chìa khóa phụ**: Báo ngay cho ban quản lý cơ sở để tạm thời hủy thẻ cũ đề phòng rủi ro mất cắp và làm thủ tục cấp lại thẻ mới.
 4. **Trích xuất camera an ninh**: Hệ thống trang bị **Camera CCTV 24/7** và nhật ký ra vào (**Access Log**). Khách hàng có thể yêu cầu trích xuất hình ảnh phục vụ kiểm tra qua Ticket Hỗ trợ mục **DAMAGE** hoặc **STORED_ITEMS**.
+
+---
+[DOCUMENT: Bao_Hiem_Va_Boi_Thuong_Thiet_Hai]
+[SECTION: Xu_Ly_Su_Co_Khan_Cap_Va_Bao_Hiem]
+1. **Hotline Khẩn Cấp 24/7**: Khi xảy ra sự cố cháy nổ, ngập nước, chập điện hoặc sự cố an ninh nghiêm trọng, liên hệ ngay Hotline khẩn cấp: **1900 6868** hoặc bấm nút **'Yêu cầu khẩn cấp'** trên ứng dụng.
+2. **Gói Bảo hiểm Hàng hóa Mặc định**: Mỗi hợp đồng thuê đều tự động được bảo hiểm phòng cháy nổ và thiên tai với mức đền bù cơ bản tối đa lên tới **50.000.000 VNĐ/ngăn kho**.
+3. **Quy trình giải quyết đền bù**:
+   - Khách hàng giữ nguyên hiện trường và gửi **Ticket Hỗ trợ loại DAMAGE (Ưu tiên URGENT)** kèm hình ảnh/video clip trong vòng **24 giờ**.
+   - Ban quản lý phối hợp đơn vị bảo hiểm giám định hiện trường trong vòng **48 giờ**.
+   - Tiền đền bù được chi trả vào tài khoản khách hàng trong vòng **7 ngày làm việc** kể từ ngày thống nhất biên bản giám định.
+4. **Miễn trừ trách nhiệm**: Hệ thống không bồi thường cho các mặt hàng thuộc danh mục **HÀNG CẤM** (chất cháy nổ, thực phẩm tươi sống...) hoặc đồ đạc tự hao mòn, hư hỏng do khách không đóng gói đúng quy cách.
+
+---
+[DOCUMENT: Chinh_Sach_Khach_Hang_Doanh_Nghiep_Va_Thue_Si]
+[SECTION: Uu_Dai_Doanh_Nghiep_Va_Thue_Nhieu_Kho]
+1. **Thuê số lượng lớn (Thuê sỉ)**: Doanh nghiệp hoặc cá nhân thuê từ **3 ngăn kho trở lên** cùng lúc được **giảm thêm 5%** trên tổng hóa đơn ngoài các mức chiết khấu kỳ hạn thông thường.
+2. **Hóa đơn tài chính (VAT)**: Hệ thống hỗ trợ xuất hóa đơn điện tử VAT đầy đủ theo thông tin doanh nghiệp, gửi tự động qua email sau mỗi kỳ thanh toán cước thuê.
+3. **Tiện ích kho bãi cao cấp**:
+   - Miễn phí sử dụng xe đẩy hàng, xe nâng tay thủy lực tại khu vực bốc dỡ hàng hóa.
+   - Hỗ trợ cấp tối đa **5 mã PIN / Thẻ khách (Guest Pass)** riêng biệt cho các nhân viên được ủy quyền ra vào kho.
+   - Khu vực bãi đỗ xe tải rộng rãi hỗ trợ xe tải từ **1.5 tấn đến 5 tấn** vào tận cửa thang hàng.
