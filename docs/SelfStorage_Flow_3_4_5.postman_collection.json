@@ -1,7 +1,7 @@
 {
   "info": {
     "_postman_id": "selfstorage-flow-3-4-5",
-    "name": "SelfStorage - Flow 3, 4, 5, 7 API Collection",
+    "name": "SelfStorage - Full API Collection (Flow 2, 3, 4, 5, 7)",
     "description": "Bộ sưu tập Postman để test toàn bộ API của Flow 3 (Quản lý kho đang thuê), Flow 4 (Quy tắc nghiệp vụ & Biểu phí), và Flow 5 (Quản lý cơ sở & Nhân viên).\n\n**Hướng dẫn sử dụng:**\n1. Import file này vào Postman.\n2. Chạy request **Login** trước để lấy `accessToken`.\n3. Token sẽ được tự động lưu vào biến `{{accessToken}}` thông qua script.\n4. Các request khác sẽ tự động sử dụng token này.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
@@ -145,6 +145,157 @@
               "path": [
                 "auth",
                 "me"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "FLOW 2 - Bàn Giao & Nhận/Trả Kho (Handovers & Check-In / Check-Out)",
+      "item": [
+        {
+          "name": "Get Reservation For Check-In (Tra cứu đơn để Check-in)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{staffToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/handovers/reservations/{{reservationId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "handovers",
+                "reservations",
+                "{{reservationId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Perform Check-In (Thực hiện Check-in nhận kho)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{staffToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reservationId\": \"{{reservationId}}\",\n  \"condition\": \"Kho sạch sẽ, không hư hỏng, khóa cửa hoạt động tốt\",\n  \"notes\": \"Đã bàn giao mã PIN mở cửa\",\n  \"photos\": [\n    \"https://res.cloudinary.com/selfstorage/image/upload/v1/handovers/checkin_1.jpg\"\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/handovers/check-in",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "handovers",
+                "check-in"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Contract For Check-Out (Tra cứu hợp đồng để Trả kho)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{staffToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/handovers/contracts/{{contractId}}/check-out",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "handovers",
+                "contracts",
+                "{{contractId}}",
+                "check-out"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Perform Check-Out (Thực hiện Trả kho & Hoàn cọc)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{staffToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"contractId\": \"{{contractId}}\",\n  \"condition\": \"Kho đã dọn sạch, tường và sàn nguyên vẹn không trầy xước\",\n  \"notes\": \"Khách hàng bàn giao đúng hạn, đã nhận lại đủ cọc\",\n  \"photos\": [\n    \"https://res.cloudinary.com/selfstorage/image/upload/v1/handovers/checkout_1.jpg\"\n  ],\n  \"damageFee\": 0,\n  \"cleaningFee\": 0,\n  \"refundDeposit\": true,\n  \"unitCondition\": \"AVAILABLE\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/handovers/check-out",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "handovers",
+                "check-out"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Upload Handover Inspection Photo (Tải ảnh hiện trạng bàn giao)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{staffToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "photo",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/handovers/upload-photo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "handovers",
+                "upload-photo"
               ]
             }
           }

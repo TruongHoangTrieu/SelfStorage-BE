@@ -995,6 +995,158 @@ _(Hoặc đăng nhập với tài khoản Admin: `admin@selfstorage.com` / `Admi
 }
 ```
 
+#### 3.25. Tra cứu hợp đồng để chuẩn bị Check-out / Trả kho (Get Contract For Check-out)
+
+- **Method**: `GET`
+- **Endpoint**: `/handovers/contracts/:contractId/check-out`
+- **Yêu cầu Auth**: **Bắt buộc** (`JwtAuthGuard`, `RolesGuard`)
+- **Roles cho phép**: `FACILITY_STAFF`, `FACILITY_MANAGER`, `BUSINESS_OPERATIONS_MANAGER`, `SYSTEM_ADMINISTRATOR`
+- **Phân quyền trạm (Staff Facility Scope)**: Nhân viên bắt buộc phải có phân công làm việc tại cơ sở của hợp đồng.
+- **Mục đích**: Nhân viên quét mã hợp đồng để kiểm tra:
+  - Thông tin khách hàng, số CCCD được mask bảo mật.
+  - Danh sách ngăn kho đang thuê và đồ đạc đang lưu trong kho (`storedItems`) để nhắc khách dọn sạch.
+  - Tổng số tiền cọc đang giữ (`totalDepositAmount`) và các khoản phụ phí còn nợ (`unpaidExtraChargesAmount`).
+  - **Biên bản bàn giao lúc Check-in ban đầu (`checkInInspection`)** kèm ảnh chụp để đối chiếu hiện trạng xem có hư hại phát sinh hay không.
+
+**Response Success (`200 OK`):**
+
+```json
+{
+  "contract": {
+    "id": "671234567890abcdef123456",
+    "contractCode": "CON-20260918-A1B2C3",
+    "status": "ACTIVE",
+    "startDate": "2026-09-18T18:40:00.000Z",
+    "endDate": "2026-12-18T18:40:00.000Z",
+    "signedAt": "2026-09-18T18:40:00.000Z"
+  },
+  "facility": {
+    "id": "671234567890abcdef000001",
+    "name": "Self Storage Facility Alpha",
+    "code": "FAC_ALPHA",
+    "address": "123 Nguyen Hue, District 1, HCMC"
+  },
+  "customer": {
+    "id": "671234567890abcdef000002",
+    "fullName": "Nguyễn Văn Khách Hàng",
+    "email": "customer@test.com",
+    "phone": "0900000005",
+    "identityNumberMasked": "079098***321"
+  },
+  "financialSummary": {
+    "totalDepositAmount": 1000000,
+    "unpaidExtraChargesAmount": 0,
+    "estimatedRefundAmount": 1000000,
+    "pendingExtraCharges": []
+  },
+  "units": [
+    {
+      "contractItemId": "671234567890abcdef111111",
+      "unitId": "671234567890abcdef222222",
+      "unitNumber": "A-101",
+      "floor": "1st Floor",
+      "unitStatus": "OCCUPIED",
+      "storedItemsCount": 0,
+      "checkInInspection": {
+        "condition": "Kho sạch sẽ, không hư hỏng, khóa cửa hoạt động tốt",
+        "notes": "Đã bàn giao mã PIN mở cửa",
+        "photos": ["https://res.cloudinary.com/.../checkin_1.jpg"]
+      }
+    }
+  ],
+  "canCheckOut": true
+}
+```
+
+#### 3.26. Thực hiện Check-out & Bàn giao hoàn trả kho (Perform Check-out & Handover Return)
+
+- **Method**: `POST`
+- **Endpoint**: `/handovers/check-out`
+- **Yêu cầu Auth**: **Bắt buộc** (`JwtAuthGuard`, `RolesGuard`)
+- **Roles cho phép**: `FACILITY_STAFF`, `FACILITY_MANAGER`, `BUSINESS_OPERATIONS_MANAGER`, `SYSTEM_ADMINISTRATOR`
+- **Quy tắc nghiệp vụ & Xử lý nguyên tử (ACID Transaction)**:
+  1. **Lập biên bản bàn giao trả kho (`HandoverRecord` CHECK_OUT)**: Ghi nhận tình trạng hiện trạng khi hoàn trả (`condition`), ghi chú (`notes`), mảng link ảnh chụp hiện trạng kho (`photos`), ngày giờ trả kho.
+  2. **Thu hồi quyền mở khóa**: Cập nhật `ContractItem`: `status = RETURNED`, `accessCodeStatus = REVOKED` (vô hiệu hóa mã PIN ngay lập tức).
+  3. **Giải phóng ngăn kho**: Cập nhật `StorageUnit.status = AVAILABLE` (hoặc `UNDER_MAINTENANCE` nếu kho bị hư hỏng cần bảo trì).
+  4. **Quyết toán tài chính & Hoàn cọc**:
+     - Nếu có phí phạt hư hỏng (`damageFee > 0`) hoặc phí dọn rác (`cleaningFee > 0`): Tự động tạo bản ghi phụ thu `ExtraCharge`.
+     - Tự động tính số tiền hoàn cọc thực tế: `refundAmount = tiền cọc - phí phạt - phí vệ sinh - phụ phí nợ`.
+     - Nếu `refundDeposit = true` và `refundAmount > 0`: Tự động tạo bản ghi `Payment` với `paymentType: REFUND`, `status: PAID` ghi nhận đã hoàn cọc cho khách.
+  5. **Hoàn tất hợp đồng**: Cập nhật `RentalContract.status = COMPLETED`.
+
+**Request Body (`CheckOutDto`):**
+
+```json
+{
+  "contractId": "671234567890abcdef123456",
+  "condition": "Kho đã dọn sạch, tường và sàn nguyên vẹn không trầy xước",
+  "notes": "Khách hàng bàn giao đúng hạn, đã nhận lại đủ cọc",
+  "photos": [
+    "https://res.cloudinary.com/selfstorage/image/upload/v1234567/handovers/checkout_1.jpg"
+  ],
+  "damageFee": 0,
+  "cleaningFee": 0,
+  "refundDeposit": true,
+  "unitCondition": "AVAILABLE"
+}
+```
+
+**Response Success (`200 OK`):**
+
+```json
+{
+  "message": "Thủ tục trả kho và bàn giao hoàn tất thành công",
+  "contract": {
+    "id": "671234567890abcdef123456",
+    "contractCode": "CON-20260918-A1B2C3",
+    "status": "COMPLETED"
+  },
+  "customer": {
+    "id": "671234567890abcdef000002",
+    "fullName": "Nguyễn Văn Khách Hàng",
+    "email": "customer@test.com"
+  },
+  "facility": {
+    "id": "671234567890abcdef000001",
+    "name": "Self Storage Facility Alpha",
+    "code": "FAC_ALPHA"
+  },
+  "handoverRecords": [
+    {
+      "id": "671234567890abcdef333333",
+      "contractItemId": "671234567890abcdef111111",
+      "type": "CHECK_OUT",
+      "condition": "Kho đã dọn sạch, tường và sàn nguyên vẹn không trầy xước",
+      "notes": "Khách hàng bàn giao đúng hạn, đã nhận lại đủ cọc",
+      "inspectionDate": "2026-10-26T00:30:00.000Z"
+    }
+  ],
+  "unitsReturned": [
+    {
+      "contractItemId": "671234567890abcdef111111",
+      "unitId": "671234567890abcdef222222",
+      "unitNumber": "A-101",
+      "unitStatus": "AVAILABLE",
+      "itemStatus": "RETURNED",
+      "accessCodeStatus": "REVOKED"
+    }
+  ],
+  "financialSettlement": {
+    "totalDeposit": 1000000,
+    "damageFee": 0,
+    "cleaningFee": 0,
+    "unpaidExtraCharges": 0,
+    "refundDepositAmount": 1000000,
+    "refundPayment": {
+      "id": "671234567890abcdef444444",
+      "paymentCode": "PAY-REF-M8ABC12-4821",
+      "amount": 1000000,
+      "status": "PAID"
+    }
+  }
+}
+```
+
 ---
 
 ## 4. Flow 4: Quy Tắc Nghiệp Vụ, Biểu Phí & Thanh Toán (Business Rules & Revenue)

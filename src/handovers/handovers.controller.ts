@@ -23,6 +23,7 @@ import {
 import { HandoversService } from './handovers.service';
 import { CloudinaryService } from '../common/cloudinary/cloudinary.service';
 import { CheckInDto } from './dto/check-in.dto';
+import { CheckOutDto } from './dto/check-out.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -31,7 +32,7 @@ import { UserRole } from '../common/enums/role.enum';
 
 import { LogCccdAccessDto } from './dto/log-cccd-access.dto';
 
-@ApiTags('Handovers & Check-In')
+@ApiTags('Handovers & Check-In / Check-Out')
 @ApiBearerAuth('JWT-auth')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('handovers')
@@ -75,6 +76,42 @@ export class HandoversController {
     @CurrentUser() user: any,
   ) {
     return this.handoversService.checkIn(checkInDto, user);
+  }
+
+  @ApiOperation({ summary: 'Tra cứu thông tin hợp đồng để nhân viên chuẩn bị Check-out / Trả kho và đối soát hiện trạng' })
+  @ApiParam({ name: 'contractId', description: 'ID hợp đồng thuê kho' })
+  @ApiResponse({ status: 200, description: 'Thông tin hợp đồng, tiền cọc, phụ phí nợ, đồ đạc trong kho và biên bản check-in ban đầu' })
+  @ApiResponse({ status: 403, description: 'Nhân viên không thuộc cơ sở của hợp đồng này' })
+  @Roles(
+    UserRole.FACILITY_STAFF,
+    UserRole.FACILITY_MANAGER,
+    UserRole.BUSINESS_OPERATIONS_MANAGER,
+    UserRole.SYSTEM_ADMINISTRATOR,
+  )
+  @Get('contracts/:contractId/check-out')
+  async getContractForCheckOut(
+    @Param('contractId') contractId: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.handoversService.getContractForCheckOut(contractId, user);
+  }
+
+  @ApiOperation({ summary: 'Thực hiện Check-out & Bàn giao hoàn trả kho (Lập biên bản trả kho, thu hồi mã PIN, giải phóng kho và thanh toán cọc)' })
+  @ApiResponse({ status: 200, description: 'Trả kho thành công, giải phóng kho và lập biên bản CHECK_OUT' })
+  @ApiResponse({ status: 400, description: 'Hợp đồng không ở trạng thái hợp lệ để trả kho' })
+  @Roles(
+    UserRole.FACILITY_STAFF,
+    UserRole.FACILITY_MANAGER,
+    UserRole.BUSINESS_OPERATIONS_MANAGER,
+    UserRole.SYSTEM_ADMINISTRATOR,
+  )
+  @Post('check-out')
+  @HttpCode(HttpStatus.OK)
+  async checkOut(
+    @Body() checkOutDto: CheckOutDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.handoversService.checkOut(checkOutDto, user);
   }
 
   @ApiOperation({ summary: 'Ghi nhận Audit Log khi mở xem hoặc in CCCD, trả về số CCCD giải mã và Signed URL ảnh' })

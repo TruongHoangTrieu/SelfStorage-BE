@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { CheckInDto } from './dto/check-in.dto';
+import { CheckOutDto } from './dto/check-out.dto';
 import { LogCccdAccessDto } from './dto/log-cccd-access.dto';
 import {
   ReservationStatus,
@@ -18,6 +19,9 @@ import {
   HandoverType,
   AccessCodeStatus,
   PaymentStatus,
+  PaymentType,
+  PaymentMethod,
+  ExtraChargeStatus,
   Prisma,
 } from '@prisma/client';
 import { UserRole } from '../common/enums/role.enum';
@@ -516,6 +520,394 @@ export class HandoversService {
           notes: hr.notes,
           inspectionDate: hr.inspectionDate,
         })),
+      };
+    });
+  }
+
+  /**
+   * Tra cứu thông tin hợp đồng để chuẩn bị Check-out / Trả kho và đối soát hiện trạng
+   */
+  async getContractForCheckOut(contractId: string, user: any) {
+    const contract = await this.prisma.rentalContract.findUnique({
+      where: { id: contractId },
+      include: {
+        reservation: {
+          include: {
+            facility: {
+              select: {
+                id: true,
+                name: true,
+                code: true,
+                address: true,
+                phone: true,
+                email: true,
+              },
+            },
+          },
+        },
+        customer: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            phone: true,
+            identityType: true,
+            identityNumber: true,
+            identityAddress: true,
+          },
+        },
+        contractItems: {
+          include: {
+            unit: {
+              include: {
+                unitType: {
+                  select: {
+                    id: true,
+                    name: true,
+                    code: true,
+                    size: true,
+                    sizeUnit: true,
+                  },
+                },
+              },
+            },
+            storedItems: true,
+            handoverRecords: {
+              where: { type: HandoverType.CHECK_IN },
+              orderBy: { createdAt: 'desc' },
+              take: 1,
+            },
+          },
+        },
+        extraCharges: {
+          include: {
+            feeType: {
+              select: {
+                id: true,
+                name: true,
+                code: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!contract) {
+      throw new NotFoundException(`Hợp đồng #${contractId} không tồn tại`);
+    }
+
+    const userRole = typeof user.role === 'string' ? user.role : user.role?.name;
+    await this.verifyStaffFacilityScope(
+      user.id,
+      userRole,
+      contract.reservation.facilityId,
+      contract.reservation.facility.name,
+    );
+
+    // Tính toán tài chính
+    const totalDepositAmount = contract.contractItems.reduce(
+      (sum, item) => sum + (item.depositAmount || 0),
+      0,
+    );
+    const pendingExtraCharges = contract.extraCharges.filter(
+      (ec) => ec.status === ExtraChargeStatus.PENDING,
+    );
+    const unpaidExtraChargesAmount = pendingExtraCharges.reduce(
+      (sum, ec) => sum + (ec.amount || 0),
+      0,
+    );
+
+    // Mask số CCCD nếu có
+    let maskedIdentity = null;
+    if (contract.customer?.identityNumber) {
+      try {
+        const raw = decryptCccd(contract.customer.identityNumber);
+        maskedIdentity = maskCccd(raw);
+      } catch {
+        maskedIdentity = '***';
+      }
+    }
+
+    return {
+      contract: {
+        id: contract.id,
+        contractCode: contract.contractCode,
+        status: contract.status,
+        startDate: contract.startDate,
+        endDate: contract.endDate,
+        signedAt: contract.signedAt,
+      },
+      facility: contract.reservation.facility,
+      customer: {
+        id: contract.customer.id,
+        fullName: contract.customer.fullName,
+        email: contract.customer.email,
+        phone: contract.customer.phone,
+        identityType: contract.customer.identityType,
+        identityNumberMasked: maskedIdentity,
+        identityAddress: contract.customer.identityAddress,
+      },
+      financialSummary: {
+        totalDepositAmount,
+        unpaidExtraChargesAmount,
+        estimatedRefundAmount: Math.max(0, totalDepositAmount - unpaidExtraChargesAmount),
+        pendingExtraCharges: pendingExtraCharges.map((ec) => ({
+          id: ec.id,
+          feeType: ec.feeType?.name,
+          amount: ec.amount,
+          reason: ec.reason,
+          status: ec.status,
+        })),
+      },
+      units: contract.contractItems.map((ci) => ({
+        contractItemId: ci.id,
+        unitId: ci.unitId,
+        unitNumber: ci.unit.unitNumber,
+        floor: ci.unit.floor,
+        unitStatus: ci.unit.status,
+        unitType: ci.unit.unitType,
+        itemStatus: ci.status,
+        accessCodeStatus: ci.accessCodeStatus,
+        depositAmount: ci.depositAmount,
+        storedItemsCount: ci.storedItems.length,
+        storedItems: ci.storedItems.map((si) => ({
+          id: si.id,
+          name: si.name,
+          category: si.category,
+          quantity: si.quantity,
+          photoUrl: si.photoUrl,
+        })),
+        checkInInspection: ci.handoverRecords[0]
+          ? {
+              condition: ci.handoverRecords[0].condition,
+              notes: ci.handoverRecords[0].notes,
+              photos: ci.handoverRecords[0].photos,
+              inspectionDate: ci.handoverRecords[0].inspectionDate,
+            }
+          : null,
+      })),
+      canCheckOut:
+        contract.status === ContractStatus.ACTIVE ||
+        contract.status === ContractStatus.OVERDUE,
+    };
+  }
+
+  /**
+   * Thực hiện Check-out & Bàn giao hoàn trả kho (Lập biên bản trả kho, thu hồi mã PIN, giải phóng kho và thanh toán cọc)
+   */
+  async checkOut(dto: CheckOutDto, user: any) {
+    const contract = await this.prisma.rentalContract.findUnique({
+      where: { id: dto.contractId },
+      include: {
+        reservation: {
+          include: {
+            facility: true,
+          },
+        },
+        customer: {
+          select: { id: true, fullName: true, email: true, phone: true },
+        },
+        contractItems: {
+          include: {
+            unit: true,
+          },
+        },
+        extraCharges: true,
+      },
+    });
+
+    if (!contract) {
+      throw new NotFoundException(`Hợp đồng #${dto.contractId} không tồn tại`);
+    }
+
+    const userRole = typeof user.role === 'string' ? user.role : user.role?.name;
+    await this.verifyStaffFacilityScope(
+      user.id,
+      userRole,
+      contract.reservation.facilityId,
+      contract.reservation.facility.name,
+    );
+
+    if (
+      contract.status !== ContractStatus.ACTIVE &&
+      contract.status !== ContractStatus.OVERDUE
+    ) {
+      throw new BadRequestException(
+        `Không thể thực hiện trả kho cho hợp đồng có trạng thái '${contract.status}' (Chỉ cho phép ACTIVE hoặc OVERDUE)`,
+      );
+    }
+
+    const activeItems = contract.contractItems.filter(
+      (i) => i.status !== ContractItemStatus.RETURNED,
+    );
+    if (activeItems.length === 0) {
+      throw new BadRequestException(
+        'Tất cả ngăn kho trong hợp đồng này đã được hoàn trả trước đó',
+      );
+    }
+
+    const totalDeposit = contract.contractItems.reduce(
+      (sum, item) => sum + (item.depositAmount || 0),
+      0,
+    );
+    const unpaidExtraCharges = contract.extraCharges
+      .filter((ec) => ec.status === ExtraChargeStatus.PENDING)
+      .reduce((sum, ec) => sum + (ec.amount || 0), 0);
+
+    const damageFee = dto.damageFee || 0;
+    const cleaningFee = dto.cleaningFee || 0;
+    const netRefundAmount =
+      dto.refundAmount !== undefined
+        ? dto.refundAmount
+        : Math.max(0, totalDeposit - damageFee - cleaningFee - unpaidExtraCharges);
+
+    return this.prisma.$transaction(async (tx) => {
+      const handoverRecords = [];
+      const targetUnitStatus =
+        dto.unitCondition || StorageUnitStatus.AVAILABLE;
+
+      for (const item of activeItems) {
+        // 1. Tạo HandoverRecord CHECK_OUT
+        const hr = await tx.handoverRecord.create({
+          data: {
+            contractItemId: item.id,
+            staffId: user.id,
+            type: HandoverType.CHECK_OUT,
+            condition: dto.condition,
+            notes: dto.notes || null,
+            photos: dto.photos
+              ? (dto.photos as Prisma.InputJsonValue)
+              : null,
+            inspectionDate: new Date(),
+          },
+        });
+        handoverRecords.push(hr);
+
+        // 2. Cập nhật ContractItem -> RETURNED & thu hồi mã PIN
+        await tx.contractItem.update({
+          where: { id: item.id },
+          data: {
+            status: ContractItemStatus.RETURNED,
+            accessCodeStatus: AccessCodeStatus.REVOKED,
+          },
+        });
+
+        // 3. Giải phóng StorageUnit -> AVAILABLE (hoặc UNDER_MAINTENANCE)
+        await tx.storageUnit.update({
+          where: { id: item.unitId },
+          data: {
+            status: targetUnitStatus,
+          },
+        });
+      }
+
+      // 4. Tạo ExtraCharge nếu có phí hư hại hoặc vệ sinh
+      const createdCharges = [];
+      if (damageFee > 0) {
+        const feeType = await tx.feeType.findFirst({
+          where: { status: 'ACTIVE' },
+        });
+        if (feeType) {
+          const ec = await tx.extraCharge.create({
+            data: {
+              contractId: contract.id,
+              feeTypeId: feeType.id,
+              amount: damageFee,
+              reason: 'Khấu trừ tiền cọc: Phí bồi thường hư hỏng trang thiết bị khi trả kho',
+              status: ExtraChargeStatus.PAID,
+              createdBy: user.id,
+            },
+          });
+          createdCharges.push(ec);
+        }
+      }
+
+      if (cleaningFee > 0) {
+        const feeType = await tx.feeType.findFirst({
+          where: { status: 'ACTIVE' },
+        });
+        if (feeType) {
+          const ec = await tx.extraCharge.create({
+            data: {
+              contractId: contract.id,
+              feeTypeId: feeType.id,
+              amount: cleaningFee,
+              reason: 'Khấu trừ tiền cọc: Phí dọn dẹp vệ sinh rác thải khi trả kho',
+              status: ExtraChargeStatus.PAID,
+              createdBy: user.id,
+            },
+          });
+          createdCharges.push(ec);
+        }
+      }
+
+      // 5. Tạo Payment record hoàn trả cọc
+      let refundPayment = null;
+      if (dto.refundDeposit !== false && netRefundAmount > 0) {
+        const paymentCode = `PAY-REF-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
+        refundPayment = await tx.payment.create({
+          data: {
+            paymentCode,
+            contractId: contract.id,
+            paymentType: PaymentType.REFUND,
+            amount: netRefundAmount,
+            paymentMethod: PaymentMethod.BANK_TRANSFER,
+            status: PaymentStatus.PAID,
+            paidAt: new Date(),
+          },
+        });
+      }
+
+      // 6. Cập nhật RentalContract -> COMPLETED
+      const updatedContract = await tx.rentalContract.update({
+        where: { id: contract.id },
+        data: {
+          status: ContractStatus.COMPLETED,
+        },
+      });
+
+      return {
+        message: 'Thủ tục trả kho và bàn giao hoàn tất thành công',
+        contract: {
+          id: updatedContract.id,
+          contractCode: updatedContract.contractCode,
+          status: updatedContract.status,
+        },
+        customer: contract.customer,
+        facility: contract.reservation.facility,
+        handoverRecords: handoverRecords.map((hr) => ({
+          id: hr.id,
+          contractItemId: hr.contractItemId,
+          type: hr.type,
+          condition: hr.condition,
+          notes: hr.notes,
+          photos: hr.photos,
+          inspectionDate: hr.inspectionDate,
+        })),
+        unitsReturned: activeItems.map((item) => ({
+          contractItemId: item.id,
+          unitId: item.unitId,
+          unitNumber: item.unit.unitNumber,
+          unitStatus: targetUnitStatus,
+          itemStatus: ContractItemStatus.RETURNED,
+          accessCodeStatus: AccessCodeStatus.REVOKED,
+        })),
+        financialSettlement: {
+          totalDeposit,
+          damageFee,
+          cleaningFee,
+          unpaidExtraCharges,
+          refundDepositAmount: netRefundAmount,
+          refundPayment: refundPayment
+            ? {
+                id: refundPayment.id,
+                paymentCode: refundPayment.paymentCode,
+                amount: refundPayment.amount,
+                status: refundPayment.status,
+              }
+            : null,
+        },
       };
     });
   }
