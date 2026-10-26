@@ -399,6 +399,11 @@ export class ReservationsService {
       if (filter.customerId) {
         where.customerId = filter.customerId;
       }
+      // Nhân viên chỉ tiếp nhận khách hàng đã cọc (CONFIRMED, IN_PROGRESS, COMPLETED...).
+      // Không đưa đơn PENDING chưa thanh toán cọc vào danh sách của nhân viên.
+      if (!filter.status) {
+        where.status = { not: ReservationStatus.PENDING };
+      }
     } else {
       // Admin / Ops Manager: Có thể xem toàn bộ hoặc lọc theo customer / facility
       if (filter.customerId) {
@@ -485,6 +490,7 @@ export class ReservationsService {
               phone: true,
             },
           },
+          payments: true,
         },
       }),
     ]);
@@ -548,6 +554,7 @@ export class ReservationsService {
             phone: true,
           },
         },
+        payments: true,
       },
     });
 
