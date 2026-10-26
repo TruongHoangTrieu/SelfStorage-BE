@@ -62,7 +62,7 @@ export class PaymentsController {
 
   // ==================== FLOW 2: CHECK-IN PAYMENT SUMMARY & RENTAL PAYMENT ====================
 
-  @ApiBearerAuth('JWT-auth')
+  @Public()
   @ApiOperation({
     summary: 'Tra cứu tổng hợp tình trạng thanh toán của đơn đặt chỗ (Flow 2: Payment Summary)',
     description:
@@ -73,12 +73,13 @@ export class PaymentsController {
   @Get('reservations/:reservationId/summary')
   async getReservationPaymentSummary(
     @Param('reservationId') reservationId: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user?: any,
   ) {
-    const userRole = typeof user.role === 'string' ? user.role : user.role?.name;
+    const userRole = user ? (typeof user.role === 'string' ? user.role : user.role?.name) : undefined;
+    const userId = user?.id;
     return this.paymentsService.getReservationPaymentSummary(
       reservationId,
-      user.id,
+      userId,
       userRole,
     );
   }

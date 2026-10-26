@@ -208,6 +208,7 @@ export class PaymentsService {
 
     if (
       userRole === UserRole.STORAGE_CUSTOMER &&
+      userId &&
       reservation.customerId !== userId
     ) {
       throw new ForbiddenException(
@@ -278,6 +279,12 @@ export class PaymentsService {
       reservationId: reservation.id,
       reservationCode: reservation.reservationCode,
       reservationStatus: reservation.status,
+      status: reservation.status,
+      reservation: {
+        id: reservation.id,
+        reservationCode: reservation.reservationCode,
+        status: reservation.status,
+      },
       depositAmount: depositRequired,
       depositPaid,
       depositPayment: depositPayment || null,
