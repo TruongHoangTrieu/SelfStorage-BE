@@ -39,7 +39,7 @@ class Settings(BaseSettings):
 
     llm_provider: str = "openrouter"  # openrouter | gemini | local
     openrouter_api_key: str = ""
-    openrouter_model: str = "google/gemma-4-31b-it:free"
+    openrouter_model: str = "google/gemma-2-9b-it:free"
 
     gemini_api_key: str = ""
     gemini_model: str = "gemini-3.8-flash"

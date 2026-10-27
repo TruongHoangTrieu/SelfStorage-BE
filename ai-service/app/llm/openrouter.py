@@ -20,7 +20,7 @@ class OpenRouterProvider(LLMProvider):
     def __init__(
         self,
         api_key: str,
-        model: str = "google/gemma-4-31b-it:free",
+        model: str = "google/gemma-2-9b-it:free",
         timeout_s: float = 30.0,
     ):
         self._api_key = api_key
@@ -50,7 +50,6 @@ class OpenRouterProvider(LLMProvider):
         # Danh sách model ứng viên theo thứ tự ưu tiên
         candidate_models = [self._model]
         fallbacks = [
-            "google/gemma-4-31b-it:free",
             "google/gemma-2-9b-it:free",
             "meta-llama/llama-3.3-70b-instruct:free",
             "mistralai/mistral-7b-instruct:free",
