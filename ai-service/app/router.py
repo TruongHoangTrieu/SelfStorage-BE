@@ -151,27 +151,27 @@ def route_with_rules(message: str) -> RouteDecision:
 
 
 def route_message(message: str, history: list[dict[str, str]] | None = None) -> RouteDecision:
-    # 1. Luôn chạy bộ lọc hàng cấm & khẩn cấp bằng rule-based trước để đảm bảo an toàn tuyệt đối
+    # 1. Chạy phân loại nhanh bằng rule-based (< 1ms)
     quick_rule = route_with_rules(message)
-    if quick_rule.intent in ["prohibited_items", "emergency_support"]:
+    # Nếu đã khớp rõ ràng với nghiệp vụ cụ thể hoặc câu chào thì dùng ngay, tránh gọi LLM 2 lần gây nghẽn/timeout
+    if quick_rule.intent != "out_of_scope" or quick_rule.confidence >= 0.8:
         return quick_rule
 
     llm = get_llm()
     if not llm.available:
         return quick_rule
 
-    # Tạo prompt với ngữ cảnh các lượt gần nhất
-    s = get_settings()
+    # 2. Với câu hỏi chưa rõ ràng, gọi LLM phân loại với ngữ cảnh ngắn gọn nhất để phản hồi tức thì
     hist_snippet = ""
     if history:
-        recent = history[-s.history_turns:]
+        recent = history[-2:]
         hist_snippet = "Lịch sử hội thoại trước:\n" + "\n".join(
             f"- {turn.get('role', 'user')}: {turn.get('content', '')}" for turn in recent
         ) + "\n\n"
 
     user_prompt = f"{hist_snippet}Tin nhắn mới nhất của khách: \"{mask_pii(message)}\""
 
-    data = llm.generate_json(_ROUTER_SYSTEM, user_prompt, retries=1)
+    data = llm.generate_json(_ROUTER_SYSTEM, user_prompt, retries=0)
     if data and isinstance(data, dict):
         raw_intent = str(data.get("intent", "")).strip().lower()
         if raw_intent in INTENTS:

@@ -338,9 +338,9 @@ def chat_endpoint(
         s = get_settings()
         hist_context = ""
         if req.history:
-            recent = req.history[-s.history_turns:]
-            hist_context = "Lịch sử cuộc trò chuyện:\n" + "\n".join(
-                f"- {turn.get('role', 'user')}: {turn.get('content', '')}" for turn in recent
+            recent = req.history[-4:]
+            hist_context = "Lịch sử cuộc trò chuyện gần nhất:\n" + "\n".join(
+                f"- {turn.get('role', 'user')}: {turn.get('content', '')[:250]}" for turn in recent
             ) + "\n\n"
 
         system_prompt = (

@@ -17,6 +17,11 @@ export class AiService {
       this.configService.get<string>('AI_SERVICE_URL') || 'http://localhost:8000';
     this.internalKey =
       this.configService.get<string>('AI_INTERNAL_KEY') || 'change_me_internal_key';
+
+    // Định kỳ 10 phút ping keep-alive để AI Service trên Render không bị ngủ đông (cold-start)
+    setInterval(() => {
+      fetch(`${this.aiServiceUrl}/health`).catch(() => {});
+    }, 10 * 60 * 1000);
   }
 
   /**
@@ -39,7 +44,7 @@ export class AiService {
           'x-internal-key': this.internalKey,
         },
         body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(15000), // Timeout 15s
+        signal: AbortSignal.timeout(45000), // Timeout 45s (đảm bảo không bị ngắt kết nối khi cold-start hoặc LLM sinh câu trả lời dài)
       });
 
       if (!response.ok) {
