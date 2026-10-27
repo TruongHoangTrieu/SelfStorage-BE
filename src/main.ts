@@ -60,6 +60,12 @@ async function bootstrap() {
       return next();
     }
 
+    // Internal server-to-server requests (AI Service <-> NestJS) carrying x-internal-key
+    const internalKey = req.headers['x-internal-key'];
+    if (internalKey) {
+      return next();
+    }
+
     // Check Origin / Referer against trusted origins whitelist
     const origin = req.headers['origin'];
     const referer = req.headers['referer'];

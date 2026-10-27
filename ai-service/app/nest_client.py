@@ -15,6 +15,7 @@ class NestClient:
     def __init__(self) -> None:
         s = get_settings()
         self._base = s.nest_base_url.rstrip("/")
+        self._fallback_base = "https://selfstorage-be-1.onrender.com/api"
         self._headers = {
             "x-internal-key": s.ai_internal_key,
             # Vượt qua middleware anti-CSRF của NestJS cho request server-to-server
@@ -27,14 +28,31 @@ class NestClient:
         headers = dict(self._headers)
         if user_id:
             headers["x-user-id"] = user_id  # user_id lấy từ JWT do NestJS truyền xuống, LLM không chọn
-        try:
-            with httpx.Client(timeout=self._timeout) as c:
-                r = c.request(method, f"{self._base}{path}", headers=headers, params=params, json=json)
-                r.raise_for_status()
-                return r.json()
-        except Exception as e:  # noqa: BLE001
-            logger.error("Gọi NestJS %s %s thất bại: %s", method, path, e)
-            return None
+
+        urls_to_try = [self._base]
+        if self._fallback_base and self._fallback_base != self._base:
+            urls_to_try.append(self._fallback_base)
+
+        last_error = None
+        for base_url in urls_to_try:
+            try:
+                with httpx.Client(timeout=self._timeout) as c:
+                    r = c.request(method, f"{base_url}{path}", headers=headers, params=params, json=json)
+                    r.raise_for_status()
+                    if base_url != self._base:
+                        logger.info("Chuyển sang dùng NestJS URL dự phòng: %s", base_url)
+                        self._base = base_url
+                    return r.json()
+            except (httpx.ConnectError, httpx.ConnectTimeout) as e:
+                last_error = e
+                logger.warning("Không thể kết nối tới NestJS tại %s (%s). Đang thử URL dự phòng...", base_url, e)
+                continue
+            except Exception as e:  # noqa: BLE001
+                logger.error("Gọi NestJS %s %s%s thất bại: %s", method, base_url, path, e)
+                return None
+
+        logger.error("Gọi NestJS %s %s thất bại trên mọi endpoint: %s", method, path, last_error)
+        return None
 
     def available_units(self, min_volume_m3: float | None = None, facility_id: str | None = None) -> list[dict] | None:
         params: dict[str, Any] = {}

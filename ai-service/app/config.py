@@ -3,6 +3,7 @@
 Thứ tự ưu tiên: biến môi trường > ai-service/.env > ../.env (file .env của NestJS).
 Nhờ vậy AI Service dùng chung DATABASE_URL với NestJS mà không cần khai báo lại.
 """
+import os
 from functools import lru_cache
 from pathlib import Path
 
@@ -26,7 +27,14 @@ class Settings(BaseSettings):
     database_url: str = ""
     mongo_db_name: str = ""  # để trống = lấy từ DATABASE_URL
 
-    nest_base_url: str = "http://localhost:5000/api"
+    nest_base_url: str = (
+        os.getenv("NEST_BASE_URL")
+        or (
+            "https://selfstorage-be-1.onrender.com/api"
+            if os.getenv("RENDER") or os.getenv("NODE_ENV") == "production"
+            else "http://localhost:5000/api"
+        )
+    )
     nest_timeout_s: float = 8.0
 
     llm_provider: str = "openrouter"  # openrouter | gemini | local
