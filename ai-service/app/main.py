@@ -245,7 +245,9 @@ def chat_endpoint(
     # ================= 4. Nhánh: get_live_data =================
     elif intent == "get_live_data":
         nest = get_nest()
-        contracts = nest.my_contracts(req.user_id)
+        # Chỉ tra cứu hợp đồng cá nhân nếu đã đăng nhập và hỏi liên quan hợp đồng
+        is_asking_contract = any(k in req.message.lower() for k in ["hop dong", "cua toi", "het han", "ma hd"])
+        contracts = nest.my_contracts(req.user_id) if (req.user_id and req.user_id != "guest" and is_asking_contract) else []
         if contracts and len(contracts) > 0:
             c = contracts[0]
             reply = (
@@ -260,22 +262,82 @@ def chat_endpoint(
         else:
             units = nest.available_units()
             cnt = len(units) if units else 0
-            reply = (
-                f"🏢 Hệ thống hiện đang có **{cnt} loại kho còn phòng trống** trên các cơ sở.\n\n"
-                f"Bạn đang tìm kho tại khu vực hay diện tích bao nhiêu để mình kiểm tra chi tiết nhé?"
-            )
             data = {"available_units_count": cnt}
 
-    # ================= 5. Nhánh: out_of_scope =================
+            llm = get_llm()
+            if llm.available:
+                sample_units_text = ""
+                if units:
+                    sample_units_text = "Một số ngăn kho trống mẫu:\n" + "\n".join(
+                        f"- Ngăn {u.get('unitNumber')} (Loại {u.get('typeName', 'Chuẩn')}, thể tích {u.get('volumeM3', 0)} m³, cơ sở {u.get('facility', {}).get('name', 'Chi nhánh')})"
+                        for u in units[:4]
+                    )
+                sys_prompt = (
+                    "Bạn là Trợ lý AI của Hệ thống Kho Lưu Trữ Tự Phục Vụ SelfStorage.\n"
+                    "Khách hàng đang muốn đặt kho, tìm kiếm kho hoặc hỏi tình hình phòng trống.\n"
+                    "Hãy trả lời nhiệt tình, thông báo số lượng kho hiện có, hướng dẫn các bước đặt kho online cực nhanh (Chọn cơ sở -> Chọn ngăn kho -> Quét mã cọc VietQR giữ chỗ tức thì).\n"
+                    "Gợi ý khách có thể liệt kê đồ đạc cần gửi để bạn tính toán thể tích m³ và tư vấn loại kho vừa vặn, tiết kiệm nhất."
+                )
+                user_p = f"Dữ liệu kho: Hiện có {cnt} ngăn kho còn phòng trống.\n{sample_units_text}\n\nKhách hỏi: \"{req.message}\""
+                llm_reply = llm.generate(sys_prompt, user_p, temperature=0.5)
+                if llm_reply and len(llm_reply.strip()) > 10:
+                    reply = llm_reply.strip()
+                else:
+                    reply = (
+                        f"🏢 Hệ thống hiện đang có **{cnt} ngăn kho còn phòng trống** sẵn sàng phục vụ bạn!\n\n"
+                        f"Bạn có thể đặt kho ngay trong 3 bước:\n"
+                        f"1. Chọn cơ sở gần bạn nhất\n"
+                        f"2. Chọn loại ngăn kho phù hợp\n"
+                        f"3. Quét mã VietQR thanh toán cọc giữ chỗ tự động.\n\n"
+                        f"💬 *Hoặc bạn có thể gửi cho mình danh sách đồ đạc cần gửi (ví dụ: 1 tủ lạnh, 10 thùng đồ...) để mình tư vấn kích thước kho chuẩn nhất nhé!*"
+                    )
+            else:
+                reply = (
+                    f"🏢 Hệ thống hiện đang có **{cnt} ngăn kho còn phòng trống** sẵn sàng phục vụ bạn!\n\n"
+                    f"Bạn có thể đặt kho ngay trên ứng dụng hoặc cho mình biết danh sách đồ đạc cần gửi để mình tư vấn ngăn kho vừa vặn nhất nhé!"
+                )
+
+    # ================= 5. Nhánh: out_of_scope & Trò chuyện tổng quát =================
     else:
-        reply = (
-            "👋 **Xin chào!** Tôi là **Trợ lý AI** của Hệ thống Kho Lưu Trữ Tự Phục Vụ (Self-Storage).\n\n"
-            "Tôi có thể hỗ trợ bạn nhanh chóng:\n"
-            "1. 📦 **Tư vấn kích thước kho phù hợp** (bạn chỉ cần liệt kê đồ đạc cần gửi như: *1 tủ lạnh, 20 thùng carton, 1 xe máy...*)\n"
-            "2. 📄 **Giải đáp chính sách & Bảng giá** (giá thuê, đặt cọc, phí phạt quá hạn, đồ cấm, thanh toán VietQR)\n"
-            "3. 🔄 **Gợi ý gói gia hạn hợp đồng** có chiết khấu cao nhất (tiết kiệm từ **5% đến 15%**)\n\n"
-            "💬 *Bạn đang cần hỗ trợ thông tin nào?*"
+        llm = get_llm()
+        s = get_settings()
+        hist_context = ""
+        if req.history:
+            recent = req.history[-s.history_turns:]
+            hist_context = "Lịch sử cuộc trò chuyện:\n" + "\n".join(
+                f"- {turn.get('role', 'user')}: {turn.get('content', '')}" for turn in recent
+            ) + "\n\n"
+
+        system_prompt = (
+            "Bạn là Trợ lý AI thông minh, linh hoạt, thân thiện của Hệ thống Kho Lưu Trữ Tự Phục Vụ SelfStorage.\n"
+            "Tính cách: Lịch thiệp, tự nhiên, thông minh, trả lời sắc bén và có chút dí dỏm nếu khách hỏi xoáy hoặc đùa vui.\n"
+            "Nhiệm vụ:\n"
+            "- Trả lời trực tiếp, thông minh, đúng trọng tâm câu hỏi của khách hàng (không lặp lại câu chào mẫu cứng nhắc).\n"
+            "- Nếu khách muốn đặt kho: Hướng dẫn khách quy trình đặt online cực kỳ tiện lợi trên Web/App và mời khách liệt kê đồ đạc để bạn tư vấn kích thước.\n"
+            "- Nếu khách hỏi các câu hỏi xã giao hoặc thắc mắc đời sống: Trả lời tự nhiên, khéo léo và liên hệ duyên dáng tới dịch vụ lưu kho an toàn của SelfStorage khi thích hợp.\n"
+            "- Trả lời bằng tiếng Việt chuẩn mực, định dạng Markdown đẹp mắt."
         )
+
+        user_prompt = f"{hist_context}Khách hàng nhắn: \"{req.message}\"\nHãy trả lời một cách thông minh, tự nhiên và hữu ích:"
+
+        llm_reply = None
+        if llm.available:
+            try:
+                llm_reply = llm.generate(system_prompt, user_prompt, temperature=0.6)
+            except Exception as e:
+                logger.warning("Lỗi sinh câu trả lời LLM cho out_of_scope: %s", e)
+
+        if llm_reply and len(llm_reply.strip()) > 10:
+            reply = llm_reply.strip()
+        else:
+            reply = (
+                "👋 **Xin chào!** Tôi là **Trợ lý AI** của Hệ thống Kho Lưu Trữ Tự Phục Vụ SelfStorage.\n\n"
+                "Tôi có thể hỗ trợ bạn:\n"
+                "• 📦 **Tư vấn kích thước kho** theo danh sách đồ đạc cần gửi\n"
+                "• 🏢 **Hướng dẫn đặt giữ chỗ kho** nhanh chóng qua VietQR\n"
+                "• 📄 **Giải đáp chính sách, bảng giá & điều khoản dịch vụ**\n\n"
+                "💬 *Bạn đang cần hỗ trợ thông tin gì về dịch vụ kho lưu trữ?*"
+            )
 
     latency_ms = int((time.perf_counter() - start_time) * 1000)
 

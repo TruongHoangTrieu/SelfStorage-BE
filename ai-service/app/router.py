@@ -64,6 +64,8 @@ _RENEWAL_KEYWORDS = [
 _LIVE_DATA_KEYWORDS = [
     "hop dong cua toi", "ma hop dong", "khi nao het han", "toi dang thue kho nao",
     "kho con trong khong", "bao gia", "gia kho", "gia thue hien tai",
+    "dat kho", "muon dat kho", "dat giu cho", "huong dan dat kho",
+    "cach dat kho", "tim kho", "thue ngan kho", "dat phong", "thue kho giup",
 ]
 
 
@@ -78,11 +80,11 @@ _ROUTER_SYSTEM = (
     "Nhiệm vụ: Đọc tin nhắn mới nhất và phân loại chính xác vào 1 trong 7 intent:\n"
     "1. 'prohibited_items': Khách muốn lưu trữ hoặc hỏi gửi hàng cấm, chất cháy nổ (xăng, dầu, gas, pháo), vũ khí, động vật sống, thực phẩm tươi sống.\n"
     "2. 'emergency_support': Sự cố khẩn cấp (cháy, ngập nước, mất cắp, kẹt khóa cửa khẩn cấp, bức xúc muốn khiếu nại, đòi đền bù).\n"
-    "3. 'size_advice': Khách nêu hoặc hỏi về đồ đạc cần lưu trữ và muốn tư vấn cỡ kho/thể tích phù hợp.\n"
-    "4. 'search_policy': Khách hỏi về chính sách, điều khoản, hủy cọc, hoàn tiền, phạt quá hạn, bảo hiểm, ưu đãi doanh nghiệp.\n"
+    "3. 'size_advice': Khách nêu danh sách đồ đạc cần gửi hoặc hỏi tư vấn kích thước/thể tích kho phù hợp.\n"
+    "4. 'search_policy': Khách hỏi về chính sách, quy định, hủy cọc, hoàn tiền, phí phạt quá hạn, bảo hiểm, thanh toán VietQR.\n"
     "5. 'recommend_package': Khách hàng đang có hợp đồng muốn hỏi nên chọn gói gia hạn nào (1, 3, 6, 12 tháng) hoặc ưu đãi gia hạn.\n"
-    "6. 'get_live_data': Khách hỏi tình trạng kho trống thực tế, tra cứu hợp đồng của chính mình, thời hạn còn lại.\n"
-    "7. 'out_of_scope': Chào hỏi xã giao, câu hỏi quá ngắn mập mờ (vd: 'kho', 'thuê kho'), hoặc không liên quan.\n\n"
+    "6. 'get_live_data': Khách muốn đặt kho, tìm kiếm kho trống thực tế, hỏi các loại phòng kho hiện có, tra cứu hợp đồng của chính mình.\n"
+    "7. 'out_of_scope': Chào hỏi xã giao, đùa vui, hỏi xoáy, hoặc các câu hỏi giao tiếp thông thường khác ngoài các nghiệp vụ trên.\n\n"
     "Trả về DUY NHẤT một chuỗi JSON: {\"intent\": \"...\", \"confidence\": 0.0 - 1.0, \"reason\": \"...\"}"
 )
 
