@@ -24,7 +24,7 @@ export class NotificationsService {
         type: dto.type || NotificationType.SYSTEM,
         entityType: dto.entityType,
         entityId: dto.entityId,
-        metadata: dto.metadata ? dto.metadata : Prisma.JsonNull,
+        metadata: dto.metadata ?? null,
       },
     });
 
