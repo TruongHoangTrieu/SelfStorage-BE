@@ -37,14 +37,17 @@ class Settings(BaseSettings):
     )
     nest_timeout_s: float = 8.0
 
-    llm_provider: str = "openrouter"  # openrouter | gemini | local
+    llm_provider: str = "openrouter"  # deepseek | openrouter | gemini | local
+    deepseek_api_key: str = ""
+    deepseek_model: str = "deepseek-chat"
+
     openrouter_api_key: str = ""
     openrouter_model: str = "google/gemma-2-9b-it:free"
 
     gemini_api_key: str = ""
     gemini_model: str = "gemini-3.8-flash"
     gemini_embedding_model: str = "gemini-embedding-001"
-    llm_timeout_s: float = 25.0
+    llm_timeout_s: float = 30.0
 
     aisle_factor: float = 0.18
     default_unit_height_m: float = 2.0

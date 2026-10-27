@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from ..config import get_settings
 from ..llm import get_llm
 from ..nest_client import get_nest
-from ..nlp.text import find_prohibited_mentions
+from ..nlp.text import detect_facility_from_text, find_prohibited_mentions
 from .item_extractor import ResolvedItem, extract_items
 
 logger = logging.getLogger(__name__)
@@ -103,6 +103,10 @@ def generate_explanation(
 
 def handle_size_advice(message: str, facility_id: str | None = None) -> SizeAdviceResult:
     s = get_settings()
+
+    if not facility_id:
+        detected_id, _ = detect_facility_from_text(message)
+        facility_id = detected_id
 
     # 1. Guardrail kiểm tra hàng cấm lưu trữ
     prohibited = find_prohibited_mentions(message)

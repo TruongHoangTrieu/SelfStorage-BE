@@ -29,6 +29,17 @@ def get_llm() -> LLMProvider:
     s = get_settings()
     provider = s.llm_provider.lower().strip()
 
+    # 0. Ưu tiên DeepSeek nếu cấu hình provider="deepseek" hoặc có DEEPSEEK_API_KEY
+    if provider == "deepseek" or s.deepseek_api_key:
+        if s.deepseek_api_key:
+            try:
+                from .deepseek import DeepSeekProvider
+
+                logger.info("LLM provider: DeepSeek (%s)", s.deepseek_model)
+                return DeepSeekProvider(s.deepseek_api_key, s.deepseek_model, s.llm_timeout_s)
+            except Exception as e:
+                logger.error("Không khởi tạo được DeepSeek: %s", e)
+
     # 1. Ưu tiên OpenRouter nếu cấu hình provider="openrouter" hoặc có OPENROUTER_API_KEY
     if provider == "openrouter" or (s.openrouter_api_key and not s.gemini_api_key):
         if s.openrouter_api_key:

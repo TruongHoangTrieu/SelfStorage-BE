@@ -66,6 +66,9 @@ _LIVE_DATA_KEYWORDS = [
     "kho con trong khong", "bao gia", "gia kho", "gia thue hien tai",
     "dat kho", "muon dat kho", "dat giu cho", "huong dan dat kho",
     "cach dat kho", "tim kho", "thue ngan kho", "dat phong", "thue kho giup",
+    "tien hanh dat kho", "dat kho giup", "dat phong giup", "giup minh dat kho",
+    "thue kho giup minh", "kho o quan", "kho o q", "q7", "q1", "q6",
+    "o quan 7", "o q7", "o quan 1", "o q1", "o binh thanh", "o thu duc",
 ]
 
 

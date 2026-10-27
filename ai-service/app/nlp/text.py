@@ -70,3 +70,49 @@ def find_prohibited_mentions(text: str) -> list[str]:
             if re.search(pattern, norm):
                 detected.append(f"{kw} ({cat})")
     return list(dict.fromkeys(detected))
+
+
+FACILITY_KEYWORDS_MAP = [
+    {
+        "id": "6ac4ea742f3017f8106ae7a9",
+        "name": "Kho Tự Quản Chi Nhánh Quận 7",
+        "keywords": ["q7", "q 7", "quan 7", "quận 7", "q.7", "tan thuan dong", "tân thuận đông", "tran trong cung", "trần trọng cung"],
+    },
+    {
+        "id": "6ac4ea742f3017f8106ae7a8",
+        "name": "Kho Tự Quản Chi Nhánh Quận 1",
+        "keywords": ["q1", "q 1", "quan 1", "quận 1", "q.1", "tan dinh", "tân định", "tran khac chan", "trần khắc chân"],
+    },
+    {
+        "id": "6ac4ea742f3017f8106ae7ab",
+        "name": "Kho Tự Quản Chi Nhánh Centre Mall - Quận 6",
+        "keywords": ["q6", "q 6", "quan 6", "quận 6", "q.6", "centre mall", "binh tien", "bình tiên", "vo van kiet", "võ văn kiệt"],
+    },
+    {
+        "id": "6ac4ea742f3017f8106ae7aa",
+        "name": "Kho Tự Quản Chi Nhánh Landmark 81 - Bình Thạnh",
+        "keywords": ["binh thanh", "bình thạnh", "landmark 81", "landmark", "phuong 22", "phường 22"],
+    },
+    {
+        "id": "6ac4ea732f3017f8106ae7a7",
+        "name": "Kho Tự Quản Chi Nhánh An Phú - TP. Thủ Đức",
+        "keywords": ["an phu", "an phú", "song hanh", "song hành", "thu duc an phu"],
+    },
+    {
+        "id": "6ac4ea732f3017f8106ae7a6",
+        "name": "Kho Tự Quản Trụ Sở Chính Võ Nguyên Giáp",
+        "keywords": ["vo nguyen giap", "võ nguyên giáp", "an khanh", "an khánh", "thu duc", "thủ đức", "tru so chinh"],
+    },
+]
+
+
+def detect_facility_from_text(text: str) -> tuple[str | None, str | None]:
+    """Nhận diện cơ sở/chi nhánh từ tin nhắn người dùng (ví dụ: Q7, Quận 1, Bình Thạnh, Thủ Đức)."""
+    norm = normalize(text)
+    for fac in FACILITY_KEYWORDS_MAP:
+        for kw in fac["keywords"]:
+            norm_kw = normalize(kw)
+            if re.search(rf"\b{re.escape(norm_kw)}\b", norm):
+                return fac["id"], fac["name"]
+    return None, None
+

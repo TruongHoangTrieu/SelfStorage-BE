@@ -30,6 +30,7 @@ from .skills.renewal_predictor import (
     predict_single_contract,
 )
 from .skills.size_advisor import handle_size_advice
+from .nlp.text import detect_facility_from_text
 
 # Đảm bảo UTF-8 logging trên Windows
 if sys.platform == "win32":
@@ -260,41 +261,75 @@ def chat_endpoint(
             )
             data = {"contract": c}
         else:
-            units = nest.available_units()
+            detected_fac_id, detected_fac_name = detect_facility_from_text(req.message)
+            effective_facility_id = req.facility_id or detected_fac_id
+            units = nest.available_units(facility_id=effective_facility_id)
             cnt = len(units) if units else 0
-            data = {"available_units_count": cnt}
+
+            suggested_list: list[dict[str, Any]] = []
+            if units:
+                for u in units[:3]:
+                    suggested_list.append({
+                        "unit_id": u.get("unitId") or u.get("id"),
+                        "unit_number": u.get("unitNumber", ""),
+                        "unit_type_id": u.get("unitTypeId", ""),
+                        "unit_type_name": u.get("unitTypeName", "Kho tiêu chuẩn"),
+                        "facility_name": u.get("facilityName", detected_fac_name or "Chi nhánh SelfStorage"),
+                        "facility_id": u.get("facilityId", effective_facility_id or ""),
+                        "size_m2": float(u.get("sizeM2", 0.0)),
+                        "volume_m3": float(u.get("volumeM3", 0.0)),
+                        "price_per_month": float(u.get("pricePerMonth", 0.0)),
+                        "deposit_amount": float(u.get("depositAmount", 0.0)),
+                    })
+
+            data = {
+                "available_units_count": cnt,
+                "suggested_units": suggested_list,
+                "facility_id": effective_facility_id,
+                "facility_name": detected_fac_name,
+            }
 
             llm = get_llm()
             if llm.available:
                 sample_units_text = ""
                 if units:
-                    sample_units_text = "Một số ngăn kho trống mẫu:\n" + "\n".join(
-                        f"- Ngăn {u.get('unitNumber')} (Loại {u.get('typeName', 'Chuẩn')}, thể tích {u.get('volumeM3', 0)} m³, cơ sở {u.get('facility', {}).get('name', 'Chi nhánh')})"
+                    sample_units_text = "Một số ngăn kho trống phù hợp:\n" + "\n".join(
+                        f"- Ngăn {u.get('unitNumber')} ({u.get('unitTypeName', 'Kho')}, DT: {u.get('sizeM2')} m², {u.get('volumeM3')} m³ tại {u.get('facilityName')})"
                         for u in units[:4]
                     )
                 sys_prompt = (
                     "Bạn là Trợ lý AI của Hệ thống Kho Lưu Trữ Tự Phục Vụ SelfStorage.\n"
-                    "Khách hàng đang muốn đặt kho, tìm kiếm kho hoặc hỏi tình hình phòng trống.\n"
-                    "Hãy trả lời nhiệt tình, thông báo số lượng kho hiện có, hướng dẫn các bước đặt kho online cực nhanh (Chọn cơ sở -> Chọn ngăn kho -> Quét mã cọc VietQR giữ chỗ tức thì).\n"
-                    "Gợi ý khách có thể liệt kê đồ đạc cần gửi để bạn tính toán thể tích m³ và tư vấn loại kho vừa vặn, tiết kiệm nhất."
+                    "Hệ thống hiện có 6 chi nhánh tại TP.HCM:\n"
+                    "1. Chi nhánh Quận 7 (Q7, FAC_Q7): 69 Trần Trọng Cung, Phường Tân Thuận Đông, Quận 7\n"
+                    "2. Chi nhánh Quận 1 (Q1, FAC_Q1): 79 Trần Khắc Chân, Phường Tân Định, Quận 1\n"
+                    "3. Chi nhánh Landmark 81 - Bình Thạnh (FAC_BTH): Tòa Landmark 81, Phường 22, Bình Thạnh\n"
+                    "4. Chi nhánh An Phú - TP. Thủ Đức (FAC_AP): 90 Song Hành, Phường An Phú, TP. Thủ Đức\n"
+                    "5. Trụ Sở Chính Võ Nguyên Giáp (FAC_TD): 375 Võ Nguyên Giáp, Phường An Khánh, TP. Thủ Đức\n"
+                    "6. Chi nhánh Centre Mall - Quận 6 (Q6, FAC_Q6): 1466 Võ Văn Kiệt, Phường Bình Tiên, Quận 6\n\n"
+                    "Khách hàng đang muốn tìm kho, hỏi phòng trống hoặc yêu cầu đặt kho giúp.\n"
+                    "Nhiệm vụ của bạn:\n"
+                    "1. Trả lời nhiệt tình, nêu rõ tình trạng ngăn kho còn trống của cơ sở khách quan tâm (đặc biệt nếu khách nhắc đến Q7, Quận 1, Bình Thạnh...).\n"
+                    "2. HƯỚNG DẪN ĐẶT KHO TỰ ĐỘNG: Thông báo cho khách biết hệ thống đã chuẩn bị sẵn các thẻ ngăn kho ngay bên dưới tin nhắn! Khách chỉ việc nhấn nút 'Đặt ngăn này ngay' -> Đăng nhập tài khoản -> Hệ thống tự động chuyển đến màn hình thanh toán cọc giữ chỗ bằng mã VietQR siêu tốc!\n"
+                    "3. Nếu khách chưa biết cần diện tích bao nhiêu: Mời khách gửi nhanh danh sách đồ đạc để bạn tính toán thể tích m³ chuẩn xác nhất."
                 )
-                user_p = f"Dữ liệu kho: Hiện có {cnt} ngăn kho còn phòng trống.\n{sample_units_text}\n\nKhách hỏi: \"{req.message}\""
+                fac_hint = f" (Cơ sở nhận diện: {detected_fac_name})" if detected_fac_name else ""
+                user_p = f"Dữ liệu kho thực tế: Có {cnt} ngăn kho còn phòng trống{fac_hint}.\n{sample_units_text}\n\nKhách nhắn: \"{req.message}\""
                 llm_reply = llm.generate(sys_prompt, user_p, temperature=0.5)
                 if llm_reply and len(llm_reply.strip()) > 10:
                     reply = llm_reply.strip()
                 else:
+                    target_name = f" tại **{detected_fac_name}**" if detected_fac_name else ""
                     reply = (
-                        f"🏢 Hệ thống hiện đang có **{cnt} ngăn kho còn phòng trống** sẵn sàng phục vụ bạn!\n\n"
-                        f"Bạn có thể đặt kho ngay trong 3 bước:\n"
-                        f"1. Chọn cơ sở gần bạn nhất\n"
-                        f"2. Chọn loại ngăn kho phù hợp\n"
-                        f"3. Quét mã VietQR thanh toán cọc giữ chỗ tự động.\n\n"
-                        f"💬 *Hoặc bạn có thể gửi cho mình danh sách đồ đạc cần gửi (ví dụ: 1 tủ lạnh, 10 thùng đồ...) để mình tư vấn kích thước kho chuẩn nhất nhé!*"
+                        f"🏢 Hệ thống hiện đang có **{cnt} ngăn kho còn phòng trống**{target_name} sẵn sàng phục vụ bạn!\n\n"
+                        f"👉 **Đặt kho giữ chỗ cực nhanh:**\n"
+                        f"Tôi đã hiển thị các ngăn kho phù hợp nhất ngay bên dưới. Bạn chỉ cần nhấn nút **[Đặt ngăn này ngay]** trên thẻ kho, hệ thống sẽ tự động hướng dẫn bạn đăng nhập và tạo mã VietQR thanh toán cọc giữ chỗ tức thì!\n\n"
+                        f"💡 *Bạn cũng có thể kể tên đồ đạc cần gửi (ví dụ: 1 tủ lạnh, 10 thùng đồ...) để tôi tính toán dung tích m³ chuẩn nhất nhé!*"
                     )
             else:
+                target_name = f" tại **{detected_fac_name}**" if detected_fac_name else ""
                 reply = (
-                    f"🏢 Hệ thống hiện đang có **{cnt} ngăn kho còn phòng trống** sẵn sàng phục vụ bạn!\n\n"
-                    f"Bạn có thể đặt kho ngay trên ứng dụng hoặc cho mình biết danh sách đồ đạc cần gửi để mình tư vấn ngăn kho vừa vặn nhất nhé!"
+                    f"🏢 Hệ thống hiện đang có **{cnt} ngăn kho còn phòng trống**{target_name} sẵn sàng phục vụ bạn!\n\n"
+                    f"Tôi đã liệt kê các ngăn kho trống ngay bên dưới. Bạn có thể nhấn nút **[Đặt ngăn này ngay]** để tiến hành đặt chỗ và quét mã VietQR tự động nhé!"
                 )
 
     # ================= 5. Nhánh: out_of_scope & Trò chuyện tổng quát =================
@@ -311,9 +346,16 @@ def chat_endpoint(
         system_prompt = (
             "Bạn là Trợ lý AI thông minh, linh hoạt, thân thiện của Hệ thống Kho Lưu Trữ Tự Phục Vụ SelfStorage.\n"
             "Tính cách: Lịch thiệp, tự nhiên, thông minh, trả lời sắc bén và có chút dí dỏm nếu khách hỏi xoáy hoặc đùa vui.\n"
+            "Hệ thống có 6 chi nhánh tại TP.HCM:\n"
+            "- Q7 / Quận 7: 69 Trần Trọng Cung, P. Tân Thuận Đông, Quận 7\n"
+            "- Q1 / Quận 1: 79 Trần Khắc Chân, P. Tân Định, Quận 1\n"
+            "- Landmark 81 - Bình Thạnh: Tòa Landmark 81, P. 22, Bình Thạnh\n"
+            "- An Phú - TP. Thủ Đức: 90 Song Hành, P. An Phú, TP. Thủ Đức\n"
+            "- Trụ Sở Chính Võ Nguyên Giáp: 375 Võ Nguyên Giáp, P. An Khánh, TP. Thủ Đức\n"
+            "- Q6 / Centre Mall: 1466 Võ Văn Kiệt, P. Bình Tiên, Quận 6\n\n"
             "Nhiệm vụ:\n"
             "- Trả lời trực tiếp, thông minh, đúng trọng tâm câu hỏi của khách hàng (không lặp lại câu chào mẫu cứng nhắc).\n"
-            "- Nếu khách muốn đặt kho: Hướng dẫn khách quy trình đặt online cực kỳ tiện lợi trên Web/App và mời khách liệt kê đồ đạc để bạn tư vấn kích thước.\n"
+            "- Nếu khách muốn đặt kho: Hướng dẫn khách quy trình đặt online cực kỳ tiện lợi trên Web/App (chọn chi nhánh -> chọn ngăn kho -> quét VietQR cọc giữ chỗ) và mời khách liệt kê đồ đạc hoặc khu vực (Q7, Q1...) để bạn lọc kho trống.\n"
             "- Nếu khách hỏi các câu hỏi xã giao hoặc thắc mắc đời sống: Trả lời tự nhiên, khéo léo và liên hệ duyên dáng tới dịch vụ lưu kho an toàn của SelfStorage khi thích hợp.\n"
             "- Trả lời bằng tiếng Việt chuẩn mực, định dạng Markdown đẹp mắt."
         )
@@ -334,7 +376,7 @@ def chat_endpoint(
                 "👋 **Xin chào!** Tôi là **Trợ lý AI** của Hệ thống Kho Lưu Trữ Tự Phục Vụ SelfStorage.\n\n"
                 "Tôi có thể hỗ trợ bạn:\n"
                 "• 📦 **Tư vấn kích thước kho** theo danh sách đồ đạc cần gửi\n"
-                "• 🏢 **Hướng dẫn đặt giữ chỗ kho** nhanh chóng qua VietQR\n"
+                "• 🏢 **Hướng dẫn đặt giữ chỗ kho** nhanh chóng qua VietQR tại 6 chi nhánh (Q7, Q1, Bình Thạnh, Thủ Đức, Q6)\n"
                 "• 📄 **Giải đáp chính sách, bảng giá & điều khoản dịch vụ**\n\n"
                 "💬 *Bạn đang cần hỗ trợ thông tin gì về dịch vụ kho lưu trữ?*"
             )
