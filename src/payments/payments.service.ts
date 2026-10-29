@@ -19,6 +19,7 @@ import {
   PaymentMethod,
   ReservationStatus,
   StorageUnitStatus,
+  ContractStatus,
   Prisma,
   NotificationType,
 } from '@prisma/client';
@@ -514,6 +515,67 @@ export class PaymentsService {
         payment = matched;
         this.logger.log(
           `Case-insensitive matched payment: "${paymentCode}" -> DB: "${payment.paymentCode}"`,
+        );
+      }
+    }
+
+    // Tự động xử lý gia hạn hợp đồng trực tuyến nếu mã bắt đầu bằng SSREN
+    if (!payment && paymentCode.toUpperCase().startsWith('SSREN')) {
+      const rawCode = paymentCode.toUpperCase().replace(/^SSREN/, '');
+      const monthsMatch = rawCode.match(/(\d+)T$/);
+      const monthsToAdd = monthsMatch ? parseInt(monthsMatch[1], 10) : 1;
+      const unitCodeCandidate = rawCode.replace(/\d+T$/, '').trim();
+
+      const matchedContractItem = await this.prisma.contractItem.findFirst({
+        where: {
+          unit: {
+            unitNumber: {
+              contains: unitCodeCandidate,
+              mode: 'insensitive',
+            },
+          },
+          contract: {
+            status: { in: [ContractStatus.ACTIVE, ContractStatus.OVERDUE] },
+          },
+        },
+        include: {
+          contract: true,
+          unit: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      if (matchedContractItem && matchedContractItem.contract) {
+        const contract = matchedContractItem.contract;
+        const currentEnd = new Date(contract.endDate);
+        const newEnd = new Date(currentEnd.getTime());
+        newEnd.setMonth(newEnd.getMonth() + monthsToAdd);
+
+        payment = await this.prisma.payment.create({
+          data: {
+            paymentCode,
+            paymentType: PaymentType.RENEWAL,
+            paymentMethod: PaymentMethod.BANK_TRANSFER,
+            amount: Number(payload.transferAmount),
+            status: PaymentStatus.PENDING,
+            contractId: contract.id,
+          },
+          include: {
+            reservation: { include: { items: true } },
+            contract: true,
+          },
+        });
+
+        await this.prisma.rentalContract.update({
+          where: { id: contract.id },
+          data: {
+            endDate: newEnd,
+            status: ContractStatus.ACTIVE,
+          },
+        });
+
+        this.logger.log(
+          `Auto-renewed contract #${contract.contractCode} by ${monthsToAdd} months via SePay Webhook ${paymentCode}. New end date: ${newEnd.toISOString()}`,
         );
       }
     }
