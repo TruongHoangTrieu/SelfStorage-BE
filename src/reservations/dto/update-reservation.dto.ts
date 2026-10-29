@@ -35,4 +35,16 @@ export class UpdateReservationDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @IsOptional()
+  @IsString()
+  startDate?: string;
+
+  @IsOptional()
+  @IsString()
+  endDate?: string;
+
+  @IsOptional()
+  @IsString()
+  dueDate?: string;
 }

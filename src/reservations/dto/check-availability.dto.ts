@@ -32,4 +32,16 @@ export class CheckAvailabilityDto {
   @IsOptional()
   @IsEnum(ReservationRentalPeriodUnit)
   rentalPeriodUnit?: ReservationRentalPeriodUnit;
+
+  @IsOptional()
+  @IsString()
+  startDate?: string;
+
+  @IsOptional()
+  @IsString()
+  endDate?: string;
+
+  @IsOptional()
+  @IsString()
+  dueDate?: string;
 }
