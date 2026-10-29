@@ -71,6 +71,7 @@ export class InternalController {
           unitTypeName: u.unitType.name,
           facilityId: u.facilityId,
           facilityName: u.facility.name,
+          facilityAddress: u.facility.address,
           sizeM2,
           volumeM3: Math.round(volumeM3 * 10) / 10,
           pricePerMonth: activePrice,

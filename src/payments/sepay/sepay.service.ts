@@ -65,8 +65,8 @@ export class SePayService {
    */
   generateQrInfo(amount: number, paymentCode: string): PaymentQrInfo {
     const bankCode = this.configService.get<string>('SEPAY_BANK_CODE') || 'MBBank';
-    const accountNumber = this.configService.get<string>('SEPAY_ACCOUNT_NUMBER') || '0900000000';
-    const accountName = this.configService.get<string>('SEPAY_ACCOUNT_NAME') || 'SELF STORAGE SYSTEM';
+    const accountNumber = this.configService.get<string>('SEPAY_ACCOUNT_NUMBER') || '0838500046';
+    const accountName = this.configService.get<string>('SEPAY_ACCOUNT_NAME') || 'TRUONG DINH LONG';
 
     // VietQR quick chart URL template: https://img.vietqr.io/image/<BANK_ID>-<ACCOUNT_NO>-compact2.png?amount=<AMOUNT>&addInfo=<CONTENT>&accountName=<NAME>
     const encodedContent = encodeURIComponent(paymentCode);
