@@ -62,6 +62,9 @@ export class HandoversService {
         endDate.setMonth(endDate.getMonth() + period);
         break;
     }
+    // Chu kỳ hợp đồng: Ngày kết thúc chu kỳ thuê là trước ngày tới hạn thanh toán 1 ngày (ví dụ: bắt đầu 29/10 thì kết thúc 28/11)
+    endDate.setDate(endDate.getDate() - 1);
+    endDate.setHours(23, 59, 59, 999);
     return endDate;
   }
 
