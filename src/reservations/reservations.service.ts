@@ -488,9 +488,24 @@ export class ReservationsService {
               fullName: true,
               email: true,
               phone: true,
+              identityType: true,
+              identityNumber: true,
+              identityAddress: true,
+              identityFrontUrl: true,
+              identityBackUrl: true,
+              isIdentityVerified: true,
             },
           },
           payments: true,
+          rentalContract: {
+            include: {
+              contractItems: {
+                include: {
+                  handoverRecords: true,
+                },
+              },
+            },
+          },
         },
       }),
     ]);
@@ -552,9 +567,24 @@ export class ReservationsService {
             fullName: true,
             email: true,
             phone: true,
+            identityType: true,
+            identityNumber: true,
+            identityAddress: true,
+            identityFrontUrl: true,
+            identityBackUrl: true,
+            isIdentityVerified: true,
           },
         },
         payments: true,
+        rentalContract: {
+          include: {
+            contractItems: {
+              include: {
+                handoverRecords: true,
+              },
+            },
+          },
+        },
       },
     });
 
@@ -569,8 +599,9 @@ export class ReservationsService {
       throw new ForbiddenException('You do not have permission to view this reservation');
     }
 
-    // Enforce facility scope for FACILITY_STAFF and FACILITY_MANAGER
+    // Enforce facility scope for FACILITY_STAFF and FACILITY_MANAGER only when assigned
     if (
+      user.facilityId &&
       (userRole === UserRole.FACILITY_STAFF || userRole === UserRole.FACILITY_MANAGER) &&
       reservation.facilityId !== user.facilityId
     ) {

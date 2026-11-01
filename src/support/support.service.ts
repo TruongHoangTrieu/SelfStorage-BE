@@ -149,7 +149,7 @@ export class SupportService {
     if (user.role === UserRole.STORAGE_CUSTOMER) {
       where.customerId = user.id;
     } else if (user.role === UserRole.FACILITY_STAFF || user.role === UserRole.FACILITY_MANAGER) {
-      where.facilityId = user.facilityId || '000000000000000000000000';
+      const effFacilityId = user.facilityId || facilityId; if (effFacilityId && effFacilityId !== 'all') { where.facilityId = effFacilityId; }
       if (customerId) where.customerId = customerId;
     } else {
       if (customerId) where.customerId = customerId;

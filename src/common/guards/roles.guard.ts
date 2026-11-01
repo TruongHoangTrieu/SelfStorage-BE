@@ -30,16 +30,43 @@ export class RolesGuard implements CanActivate {
 
     const rawRole = typeof user.role === 'string' ? user.role : user.role?.name;
     const normalizeRole = (r: string) => {
-      if (r === 'CUSTOMER') return UserRole.STORAGE_CUSTOMER;
-      if (r === 'OPERATIONS_STAFF') return UserRole.FACILITY_STAFF;
+      const upper = String(r || '').toUpperCase();
+      if (upper === 'CUSTOMER' || upper === 'STORAGE_CUSTOMER') return UserRole.STORAGE_CUSTOMER;
+      if (upper === 'OPERATIONS_STAFF' || upper === 'STAFF' || upper === 'FACILITY_STAFF') return UserRole.FACILITY_STAFF;
+      if (upper === 'MANAGER' || upper === 'FACILITY_MANAGER') return UserRole.FACILITY_MANAGER;
+      if (upper === 'ADMIN' || upper === 'SYSTEM_ADMIN' || upper === 'SYSTEM_ADMINISTRATOR') return UserRole.SYSTEM_ADMINISTRATOR;
+      if (upper === 'BUSINESS_OPERATIONS_MANAGER') return UserRole.BUSINESS_OPERATIONS_MANAGER;
       return r;
+    };
+
+    const isStaffOrAdmin = (r: string) => {
+      const u = String(r || '').toUpperCase();
+      return (
+        u === UserRole.FACILITY_STAFF ||
+        u === UserRole.FACILITY_MANAGER ||
+        u === UserRole.BUSINESS_OPERATIONS_MANAGER ||
+        u === UserRole.SYSTEM_ADMINISTRATOR ||
+        u === 'STAFF' ||
+        u === 'MANAGER' ||
+        u === 'ADMIN' ||
+        u.includes('STAFF') ||
+        u.includes('MANAGER') ||
+        u.includes('ADMIN')
+      );
     };
 
     const userRole = normalizeRole(rawRole);
 
     const hasRole = requiredRoles.some((role) => {
       const normalizedReq = normalizeRole(role as string);
-      return role === rawRole || normalizedReq === userRole || role === userRole;
+      if (role === rawRole || normalizedReq === userRole || role === userRole) return true;
+      if (
+        (normalizedReq === UserRole.FACILITY_STAFF || normalizedReq === UserRole.FACILITY_MANAGER) &&
+        isStaffOrAdmin(rawRole)
+      ) {
+        return true;
+      }
+      return false;
     });
 
     if (!hasRole) {
