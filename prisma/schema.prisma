@@ -453,6 +453,7 @@ model RentalContract {
   customerIdentityFrontUrl String?       @map("customer_identity_front_url")
   customerIdentityBackUrl  String?       @map("customer_identity_back_url")
   customerAddress          String?       @map("customer_address")
+  customerSignature        String?       @map("customer_signature")
 
   reservation    Reservation       @relation(fields: [reservationId], references: [id])
   customer       User              @relation("CustomerContracts", fields: [customerId], references: [id])
@@ -506,6 +507,7 @@ model HandoverRecord {
   condition      String       @map("condition")
   notes          String?      @map("notes")
   photos         Json?        @map("photos")
+  customerSignature String?   @map("customer_signature")
   inspectionDate DateTime     @map("inspection_date")
   createdAt      DateTime     @default(now()) @map("created_at")
   updatedAt      DateTime     @updatedAt @map("updated_at")

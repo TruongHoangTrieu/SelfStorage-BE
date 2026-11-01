@@ -52,4 +52,8 @@ export class CheckInDto {
   @IsOptional()
   @IsString({ message: 'unitCode must be a string' })
   unitCode?: string;
+
+  @IsOptional()
+  @IsString({ message: 'customerSignature must be a string or svg data url' })
+  customerSignature?: string;
 }

@@ -97,4 +97,11 @@ export class CheckOutDto {
     message: 'unitCondition must be AVAILABLE or UNDER_MAINTENANCE',
   })
   unitCondition?: StorageUnitStatus;
+
+  @ApiPropertyOptional({
+    description: 'Chữ ký điện tử của khách hàng hoặc nhân viên (mã hóa chuỗi hoặc URL ảnh)',
+  })
+  @IsOptional()
+  @IsString({ message: 'customerSignature must be a string' })
+  customerSignature?: string;
 }

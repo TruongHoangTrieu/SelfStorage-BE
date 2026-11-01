@@ -399,6 +399,7 @@ export class HandoversService {
           customerIdentityFrontUrl,
           customerIdentityBackUrl,
           customerAddress,
+          customerSignature: dto.customerSignature || null,
         },
       });
 
@@ -444,6 +445,7 @@ export class HandoversService {
               ? (dto.photos as Prisma.InputJsonValue)
               : null,
             inspectionDate: new Date(),
+            customerSignature: dto.customerSignature || null,
           },
         });
         handoverRecords.push(handoverRecord);
@@ -783,6 +785,7 @@ export class HandoversService {
               ? (dto.photos as Prisma.InputJsonValue)
               : null,
             inspectionDate: new Date(),
+            customerSignature: dto.customerSignature || null,
           },
         });
         handoverRecords.push(hr);

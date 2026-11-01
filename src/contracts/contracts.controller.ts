@@ -93,8 +93,9 @@ export class ContractsController {
   async signContract(
     @Param('id') id: string,
     @CurrentUser() user: any,
+    @Body() body?: { signature?: string },
   ) {
-    return this.contractsService.signContract(id, user.id);
+    return this.contractsService.signContract(id, user.id, body?.signature);
   }
 
   @ApiOperation({ summary: 'Thanh lý / Chấm dứt hợp đồng và giải phóng ngăn kho (Manager / Admin)' })

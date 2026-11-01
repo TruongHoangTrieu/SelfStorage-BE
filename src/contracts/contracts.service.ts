@@ -163,7 +163,7 @@ export class ContractsService {
   /**
    * Khách hàng ký điện tử hợp đồng
    */
-  async signContract(contractId: string, userId: string) {
+  async signContract(contractId: string, userId: string, signature?: string) {
     const contract = await this.prisma.rentalContract.findUnique({
       where: { id: contractId },
     });
@@ -184,6 +184,7 @@ export class ContractsService {
       where: { id: contractId },
       data: {
         signedAt: new Date(),
+        customerSignature: signature || undefined,
         status: ContractStatus.ACTIVE,
       },
     });
