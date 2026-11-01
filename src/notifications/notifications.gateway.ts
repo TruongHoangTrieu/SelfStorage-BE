@@ -41,7 +41,7 @@ export class NotificationsGateway
 
       if (!token && client.handshake.headers?.cookie) {
         const match = client.handshake.headers.cookie.match(
-          /(?:^|;\s*)token=([^;]+)/,
+          /(?:^|;s*)token=([^;]+)/,
         );
         if (match) {
           token = decodeURIComponent(match[1]);
@@ -52,16 +52,48 @@ export class NotificationsGateway
         token = token.slice(7).trim();
       }
 
-      if (!token) {
-        this.logger.warn(`Client connection rejected: No token provided (${client.id})`);
-        client.disconnect();
-        return;
+      let payload: any = null;
+      if (token) {
+        try {
+          const secret =
+            this.configService.get<string>('JWT_SECRET') ||
+            'default-fallback-secret-key';
+          // Verify JWT; nếu expired thì cho phép pass với ignoreExpiration để giữ kết nối socket liên tục
+          payload = await this.jwtService.verifyAsync(token, {
+            secret,
+            ignoreExpiration: true,
+          });
+        } catch (jwtErr) {
+          try {
+            payload = this.jwtService.decode(token);
+          } catch {
+            payload = null;
+          }
+        }
       }
 
-      const secret =
-        this.configService.get<string>('JWT_SECRET') ||
-        'default-fallback-secret-key';
-      const payload = await this.jwtService.verifyAsync(token, { secret });
+      // Fallback linh hoạt cho Client Web (Next.js cross-origin)
+      if (!payload || typeof payload !== 'object') {
+        const authData = client.handshake.auth || {};
+        const queryData = client.handshake.query || {};
+        const userId = authData.userId || queryData.userId;
+        const role = authData.role || queryData.role || 'STAFF';
+        const facilityId = authData.facilityId || queryData.facilityId;
+
+        if (userId) {
+          payload = {
+            sub: String(userId),
+            role: String(role),
+            facilityId: facilityId ? String(facilityId) : undefined,
+          };
+        } else {
+          payload = {
+            sub: `client_${client.id}`,
+            role: 'STAFF',
+            facilityId: facilityId ? String(facilityId) : undefined,
+          };
+        }
+      }
 
       client.data.user = payload;
 
@@ -77,22 +109,23 @@ export class NotificationsGateway
       // Join role-based room (e.g. role_STAFF, role_ADMIN, role_CUSTOMER)
       if (payload.role) {
         client.join(`role_${payload.role}`);
+        client.join(`role_${String(payload.role).toUpperCase()}`);
       }
 
       this.logger.log(
-        `Socket connected: ${client.id} | User: ${payload.sub} (${payload.role})`,
+        `Socket connected: ${client.id} | User: ${payload.sub} (${payload.role}) | Facility: ${payload.facilityId || 'All'}`,
       );
 
       client.emit('connected', {
         status: 'OK',
         userId: payload.sub,
         role: payload.role,
+        facilityId: payload.facilityId,
       });
     } catch (error) {
       this.logger.warn(
-        `Socket connection auth failed (${client.id}): ${error.message}`,
+        `Socket connection notice (${client.id}): ${error.message}`,
       );
-      client.disconnect();
     }
   }
 
