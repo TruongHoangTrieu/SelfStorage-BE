@@ -99,15 +99,23 @@ export class OperationsService {
   }
 
   async updateFeeType(id: string, dto: Partial<CreateFeeTypeDto>) {
-    const feeType = await this.prisma.feeType.findUnique({
-      where: { id },
-    });
+    let feeType = null;
+    if (id && id.length === 24 && /^[0-9a-fA-F]{24}$/.test(id)) {
+      feeType = await this.prisma.feeType.findUnique({
+        where: { id },
+      });
+    }
+    if (!feeType && dto.code) {
+      feeType = await this.prisma.feeType.findUnique({
+        where: { code: dto.code.toUpperCase() },
+      });
+    }
     if (!feeType) {
-      throw new NotFoundException(`FeeType with ID ${id} not found`);
+      throw new NotFoundException(`FeeType with ID or Code ${id} not found`);
     }
 
     return this.prisma.feeType.update({
-      where: { id },
+      where: { id: feeType.id },
       data: {
         ...(dto.name && { name: dto.name }),
         ...(dto.code && { code: dto.code.toUpperCase() }),
