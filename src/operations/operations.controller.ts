@@ -4,6 +4,9 @@ import {
   Post,
   Body,
   Param,
+  Put,
+  Delete,
+  Patch,
   Query,
   UseGuards,
   HttpCode,
@@ -84,13 +87,59 @@ export class OperationsController {
   }
 
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Tạo loại phụ phí mới (Operations Manager / Admin)' })
+  @ApiOperation({ summary: 'Tạo loại phụ phí mới (Facility Manager / Operations Manager / Admin)' })
   @ApiResponse({ status: 201, description: 'Tạo loại phụ phí thành công' })
-  @Roles(UserRole.BUSINESS_OPERATIONS_MANAGER, UserRole.SYSTEM_ADMINISTRATOR)
+  @Roles(
+    UserRole.FACILITY_MANAGER,
+    UserRole.BUSINESS_OPERATIONS_MANAGER,
+    UserRole.SYSTEM_ADMINISTRATOR,
+  )
   @Post('fee-types')
   @HttpCode(HttpStatus.CREATED)
   async createFeeType(@Body() dto: CreateFeeTypeDto) {
     return this.operationsService.createFeeType(dto);
+  }
+
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Cập nhật loại phụ phí (Facility Manager / Operations Manager / Admin)' })
+  @ApiResponse({ status: 200, description: 'Cập nhật loại phụ phí thành công' })
+  @Roles(
+    UserRole.FACILITY_MANAGER,
+    UserRole.BUSINESS_OPERATIONS_MANAGER,
+    UserRole.SYSTEM_ADMINISTRATOR,
+  )
+  @Put('fee-types/:id')
+  async updateFeeType(
+    @Param('id') id: string,
+    @Body() dto: Partial<CreateFeeTypeDto>,
+  ) {
+    return this.operationsService.updateFeeType(id, dto);
+  }
+
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Xóa loại phụ phí (Facility Manager / Operations Manager / Admin)' })
+  @ApiResponse({ status: 200, description: 'Xóa loại phụ phí thành công' })
+  @Roles(
+    UserRole.FACILITY_MANAGER,
+    UserRole.BUSINESS_OPERATIONS_MANAGER,
+    UserRole.SYSTEM_ADMINISTRATOR,
+  )
+  @Delete('fee-types/:id')
+  async deleteFeeType(@Param('id') id: string) {
+    return this.operationsService.deleteFeeType(id);
+  }
+
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Bật/tắt trạng thái loại phụ phí (Facility Manager / Operations Manager / Admin)' })
+  @ApiResponse({ status: 200, description: 'Cập nhật trạng thái thành công' })
+  @Roles(
+    UserRole.FACILITY_MANAGER,
+    UserRole.BUSINESS_OPERATIONS_MANAGER,
+    UserRole.SYSTEM_ADMINISTRATOR,
+  )
+  @Patch('fee-types/:id/toggle-status')
+  async toggleFeeTypeStatus(@Param('id') id: string) {
+    return this.operationsService.toggleFeeTypeStatus(id);
   }
 
   @ApiBearerAuth('JWT-auth')

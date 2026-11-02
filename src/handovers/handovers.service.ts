@@ -769,6 +769,7 @@ export class HandoversService {
         unitStatus: ci.unit.status,
         unitType: ci.unit.unitType,
         itemStatus: ci.status,
+        accessCode: ci.accessCode,
         accessCodeStatus: ci.accessCodeStatus,
         depositAmount: ci.depositAmount,
         storedItemsCount: ci.storedItems.length,

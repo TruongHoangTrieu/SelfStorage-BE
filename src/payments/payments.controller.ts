@@ -21,6 +21,7 @@ import {
 import { PaymentsService } from './payments.service';
 import { CreateDepositPaymentDto } from './dto/create-payment.dto';
 import { CreateRentalPaymentDto } from './dto/create-rental-payment.dto';
+import { CreateSurchargePaymentDto } from './dto/create-surcharge-payment.dto';
 import { SePayWebhookDto } from './dto/sepay-webhook.dto';
 import { FilterPaymentDto } from './dto/filter-payment.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -117,6 +118,34 @@ export class PaymentsController {
   })
   @ApiResponse({ status: 200, description: 'Webhook xử lý thành công hoặc bỏ qua trùng lặp an toàn' })
   @ApiResponse({ status: 401, description: 'Xác thực SePay webhook thất bại' })
+  @ApiOperation({ summary: 'Tạo mã thanh toán phụ thu (Surcharge) tích hợp SePay VietQR' })
+  @ApiResponse({ status: 201, description: 'Tạo mã thanh toán phụ thu thành công' })
+  @Public()
+  @Post('surcharge')
+  @HttpCode(HttpStatus.CREATED)
+  async createSurchargePayment(
+    @CurrentUser() user: any,
+    @Body() dto: CreateSurchargePaymentDto,
+  ) {
+    return this.paymentsService.createSurchargePayment(user, dto);
+  }
+
+    @Public()
+  @ApiOperation({ summary: 'Tra cứu trạng thái phụ thu SePay mới nhất theo hợp đồng' })
+  @Get('contract/:contractId/surcharge-status')
+  async getContractSurchargeStatus(@Param('contractId') contractId: string) {
+    return this.paymentsService.getLatestSurchargeByContract(contractId);
+  }
+
+  @Public()
+  @ApiOperation({ summary: 'Tra cứu trạng thái thanh toán qua paymentCode (cho App polling SePay)' })
+  @ApiResponse({ status: 200, description: 'Trạng thái thanh toán' })
+  @Get('code/:paymentCode/status')
+  async getPaymentStatusByCode(@Param('paymentCode') paymentCode: string) {
+    return this.paymentsService.getPaymentStatusByCode(paymentCode);
+  }
+
+  @Public()
   @Post('sepay/webhook')
   @HttpCode(HttpStatus.OK)
   async handleSePayWebhook(

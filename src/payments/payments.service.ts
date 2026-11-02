@@ -11,6 +11,7 @@ import { PrismaService } from '../database/prisma.service';
 import { SePayService } from './sepay/sepay.service';
 import { CreateDepositPaymentDto } from './dto/create-payment.dto';
 import { CreateRentalPaymentDto } from './dto/create-rental-payment.dto';
+import { CreateSurchargePaymentDto } from './dto/create-surcharge-payment.dto';
 import { SePayWebhookDto } from './dto/sepay-webhook.dto';
 import { FilterPaymentDto } from './dto/filter-payment.dto';
 import {
@@ -417,6 +418,114 @@ export class PaymentsService {
         reservationCode: reservation.reservationCode,
         status: reservation.status,
       },
+    };
+  }
+
+  /**
+   * Tạo yêu cầu thanh toán phụ thu (Surcharge Payment) tích hợp SePay
+   */
+  async createSurchargePayment(user: any, dto: CreateSurchargePaymentDto) {
+    if (dto.amount <= 0) {
+      throw new BadRequestException('Số tiền phụ thu phải lớn hơn 0');
+    }
+
+    // Generate unique code starting with PAY (matches SePay extractPaymentCode regex)
+    const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const timestampSuffix = Date.now().toString(36).slice(-4).toUpperCase();
+    const paymentCode = `PAYSUR${timestampSuffix}${randomSuffix}`;
+
+    const payment = await this.prisma.payment.create({
+      data: {
+        paymentCode,
+        contractId: dto.contractId || null,
+        reservationId: dto.reservationId || null,
+        paymentType: PaymentType.EXTRA_CHARGE,
+        amount: dto.amount,
+        paymentMethod: dto.paymentMethod || PaymentMethod.BANK_TRANSFER,
+        status: PaymentStatus.PENDING,
+      },
+    });
+
+    this.logger.log(
+      `Created SURCHARGE Payment ${paymentCode} for contract ${dto.contractId || 'N/A'} with amount ${dto.amount}`,
+    );
+
+    const qrInfo = this.sePayService.generateQrInfo(
+      Number(dto.amount),
+      paymentCode,
+    );
+
+    return {
+      payment,
+      qr: qrInfo,
+      paymentCode,
+    };
+  }
+
+  /**
+   * Tra cứu trạng thái thanh toán qua mã paymentCode (Polling cho Mobile App)
+   */
+  /**
+   * Tra cứu giao dịch phụ thu mới nhất của một hợp đồng
+   */
+  async getLatestSurchargeByContract(contractId: string) {
+    const payment = await this.prisma.payment.findFirst({
+      where: {
+        contractId,
+        paymentType: PaymentType.EXTRA_CHARGE,
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        paymentCode: true,
+        amount: true,
+        status: true,
+        paidAt: true,
+        createdAt: true,
+      },
+    });
+
+    if (!payment) return null;
+
+    return {
+      paymentCode: payment.paymentCode,
+      status: payment.status,
+      isPaid: payment.status === PaymentStatus.PAID,
+      amount: payment.amount,
+      paidAt: payment.paidAt,
+      createdAt: payment.createdAt,
+    };
+  }
+
+  async getPaymentStatusByCode(paymentCode: string) {
+    const payment = await this.prisma.payment.findUnique({
+      where: { paymentCode: paymentCode.trim().toUpperCase() },
+      select: {
+        id: true,
+        paymentCode: true,
+        amount: true,
+        paymentType: true,
+        paymentMethod: true,
+        status: true,
+        paidAt: true,
+        createdAt: true,
+      },
+    });
+
+    if (!payment) {
+      return {
+        paymentCode,
+        status: 'PENDING',
+        isPaid: false,
+      };
+    }
+
+    return {
+      paymentCode: payment.paymentCode,
+      status: payment.status,
+      isPaid: payment.status === PaymentStatus.PAID,
+      amount: payment.amount,
+      paidAt: payment.paidAt,
     };
   }
 

@@ -98,6 +98,56 @@ export class OperationsService {
     });
   }
 
+  async updateFeeType(id: string, dto: Partial<CreateFeeTypeDto>) {
+    const feeType = await this.prisma.feeType.findUnique({
+      where: { id },
+    });
+    if (!feeType) {
+      throw new NotFoundException(`FeeType with ID ${id} not found`);
+    }
+
+    return this.prisma.feeType.update({
+      where: { id },
+      data: {
+        ...(dto.name && { name: dto.name }),
+        ...(dto.code && { code: dto.code.toUpperCase() }),
+        ...(dto.description !== undefined && { description: dto.description }),
+        ...(dto.defaultAmount !== undefined && { defaultAmount: Number(dto.defaultAmount) }),
+        ...(dto.amountType && { amountType: dto.amountType }),
+        ...(dto.appliesTo && { appliesTo: dto.appliesTo }),
+        ...(dto.status && { status: dto.status }),
+      },
+    });
+  }
+
+  async deleteFeeType(id: string) {
+    const feeType = await this.prisma.feeType.findUnique({
+      where: { id },
+    });
+    if (!feeType) {
+      throw new NotFoundException(`FeeType with ID ${id} not found`);
+    }
+
+    return this.prisma.feeType.delete({
+      where: { id },
+    });
+  }
+
+  async toggleFeeTypeStatus(id: string) {
+    const feeType = await this.prisma.feeType.findUnique({
+      where: { id },
+    });
+    if (!feeType) {
+      throw new NotFoundException(`FeeType with ID ${id} not found`);
+    }
+
+    const nextStatus = feeType.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+    return this.prisma.feeType.update({
+      where: { id },
+      data: { status: nextStatus },
+    });
+  }
+
   async createExtraCharge(userId: string, dto: CreateExtraChargeDto) {
     const feeType = await this.prisma.feeType.findUnique({
       where: { id: dto.feeTypeId },
