@@ -346,9 +346,23 @@ export class HandoversService {
           });
         }
 
+        // Đồng bộ snapshot CCCD mới vào RentalContract
+        await this.prisma.rentalContract.update({
+          where: { id: contract.id },
+          data: {
+            customerIdentityType: dto.identityType || 'CCCD',
+            customerIdentityNumber: dto.identityNumber ? encryptCccd(dto.identityNumber.trim()) : undefined,
+            customerIdentityFrontUrl: dto.identityFrontUrl || undefined,
+            customerIdentityBackUrl: dto.identityBackUrl || undefined,
+            customerAddress: dto.identityAddress ? dto.identityAddress.trim() : undefined,
+            customerSignature: dto.customerSignature || undefined,
+          },
+        });
+
         return {
           message: 'Cập nhật biên bản bàn giao kho thành công',
           contract,
+          contractItems: contract.contractItems,
           handoverRecord: updatedRecord,
         };
       }

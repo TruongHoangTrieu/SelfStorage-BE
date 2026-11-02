@@ -23,6 +23,7 @@ import {
 } from '@prisma/client';
 import { UserRole } from '../common/enums/role.enum';
 import { NotificationsService } from '../notifications/notifications.service';
+import { decryptCccd } from '../common/utils/crypto.util';
 
 @Injectable()
 export class ReservationsService {
