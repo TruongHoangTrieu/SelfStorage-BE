@@ -4,6 +4,8 @@ import {
   ForbiddenException,
   BadRequestException,
   Logger,
+  OnModuleInit,
+  OnModuleDestroy,
 } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { CreateSupportRequestDto } from './dto/create-support-request.dto';
@@ -16,15 +18,136 @@ import {
 import { SupportStatus, SupportPriority, UserStatus, NotificationType } from '@prisma/client';
 import { UserRole } from '../common/enums/role.enum';
 import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationsGateway } from '../notifications/notifications.gateway';
 
 @Injectable()
-export class SupportService {
+export class SupportService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(SupportService.name);
+  private watchTimer: NodeJS.Timeout | null = null;
+  private isWatcherInitialized = false;
+  private knownTickets = new Map<string, { status: string; logCount: number; updatedAt: number }>();
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
+    private readonly notificationsGateway: NotificationsGateway,
   ) {}
+
+  onModuleInit() {
+    this.startRealtimeDbSync();
+  }
+
+  onModuleDestroy() {
+    if (this.watchTimer) {
+      clearInterval(this.watchTimer);
+      this.watchTimer = null;
+    }
+  }
+
+  /**
+   * Đồng bộ thời gian thực từ MongoDB Atlas:
+   * Khi ứng dụng Mobile gọi API qua Render Cloud nhưng Web kết nối vào Backend Localhost,
+   * Watcher này sẽ phát hiện ngay các phiếu mới hoặc cập nhật mới trong DB và phát WebSocket tức thì.
+   */
+  private startRealtimeDbSync() {
+    const syncOnce = async () => {
+      try {
+        const items = await this.prisma.supportRequest.findMany({
+          take: 40,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            customer: {
+              select: { id: true, fullName: true, email: true, phone: true },
+            },
+            facility: {
+              select: { id: true, name: true, code: true, address: true },
+            },
+            contractItem: {
+              select: {
+                id: true,
+                unit: {
+                  select: { id: true, unitNumber: true, floor: true },
+                },
+              },
+            },
+            assignedStaff: {
+              select: { id: true, fullName: true, email: true },
+            },
+            logs: {
+              orderBy: { createdAt: 'asc' },
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    fullName: true,
+                    email: true,
+                    role: { select: { name: true } },
+                  },
+                },
+              },
+            },
+          },
+        });
+
+        if (!this.isWatcherInitialized) {
+          for (const item of items) {
+            this.knownTickets.set(item.id, {
+              status: item.status,
+              logCount: item.logs?.length || 0,
+              updatedAt: new Date(item.updatedAt).getTime(),
+            });
+          }
+          this.isWatcherInitialized = true;
+          return;
+        }
+
+        for (const item of items) {
+          const prev = this.knownTickets.get(item.id);
+          const currentLogCount = item.logs?.length || 0;
+          const currentUpdatedAt = new Date(item.updatedAt).getTime();
+
+          if (!prev) {
+            this.knownTickets.set(item.id, {
+              status: item.status,
+              logCount: currentLogCount,
+              updatedAt: currentUpdatedAt,
+            });
+            this.logger.log(`[RealtimeSync] Phát hiện phiếu hỗ trợ mới từ DB: #${item.requestCode}`);
+            this.notificationsGateway.sendToUser(item.customerId, 'support_ticket_created', item);
+            this.notificationsGateway.sendToFacility(item.facilityId, 'support_ticket_created', item);
+            this.notificationsGateway.broadcast('support_ticket_created', item);
+          } else if (
+            prev.status !== item.status ||
+            prev.logCount !== currentLogCount ||
+            prev.updatedAt !== currentUpdatedAt
+          ) {
+            const logIncreased = currentLogCount > prev.logCount;
+            this.knownTickets.set(item.id, {
+              status: item.status,
+              logCount: currentLogCount,
+              updatedAt: currentUpdatedAt,
+            });
+            this.logger.log(`[RealtimeSync] Phát hiện cập nhật phiếu hỗ trợ từ DB: #${item.requestCode}`);
+            if (logIncreased && item.logs && item.logs.length > 0) {
+              const latestLog = item.logs[item.logs.length - 1];
+              const eventData = { ticketId: item.id, log: latestLog };
+              this.notificationsGateway.sendToUser(item.customerId, 'support_ticket_note_added', eventData);
+              this.notificationsGateway.sendToFacility(item.facilityId, 'support_ticket_note_added', eventData);
+              this.notificationsGateway.broadcast('support_ticket_note_added', eventData);
+            }
+            this.notificationsGateway.sendToUser(item.customerId, 'support_ticket_updated', item);
+            this.notificationsGateway.sendToFacility(item.facilityId, 'support_ticket_updated', item);
+            this.notificationsGateway.broadcast('support_ticket_updated', item);
+          }
+        }
+      } catch {
+        // Ignore transient DB errors
+      }
+    };
+
+    syncOnce();
+    this.watchTimer = setInterval(syncOnce, 2000);
+  }
 
   /**
    * Tạo mã yêu cầu hỗ trợ duy nhất (Request Code)
@@ -124,6 +247,18 @@ export class SupportService {
       .catch((err) =>
         this.logger.error(`Failed to notify staff of new support ticket: ${err.message}`),
       );
+
+    // Ghi nhận trạng thái vào bộ nhớ đồng bộ
+    this.knownTickets.set(created.id, {
+      status: created.status,
+      logCount: 1,
+      updatedAt: new Date(created.updatedAt).getTime(),
+    });
+
+    // Realtime WebSocket broadcast
+    this.notificationsGateway.sendToUser(userId, 'support_ticket_created', created);
+    this.notificationsGateway.sendToFacility(dto.facilityId, 'support_ticket_created', created);
+    this.notificationsGateway.broadcast('support_ticket_created', created);
 
     return created;
   }
@@ -362,6 +497,11 @@ export class SupportService {
         this.logger.error(`Failed to notify assigned staff: ${err.message}`),
       );
 
+    // Realtime WebSocket broadcast
+    this.notificationsGateway.sendToUser(request.customerId, 'support_ticket_updated', assignResult.request);
+    this.notificationsGateway.sendToFacility(request.facilityId, 'support_ticket_updated', assignResult.request);
+    this.notificationsGateway.broadcast('support_ticket_updated', assignResult.request);
+
     return assignResult;
   }
 
@@ -442,6 +582,11 @@ export class SupportService {
         );
     }
 
+    // Realtime WebSocket broadcast
+    this.notificationsGateway.sendToUser(request.customerId, 'support_ticket_updated', progressResult.request);
+    this.notificationsGateway.sendToFacility(request.facilityId, 'support_ticket_updated', progressResult.request);
+    this.notificationsGateway.broadcast('support_ticket_updated', progressResult.request);
+
     return progressResult;
   }
 
@@ -484,6 +629,12 @@ export class SupportService {
         },
       },
     });
+
+    // Realtime WebSocket broadcast
+    const eventData = { ticketId: id, log };
+    this.notificationsGateway.sendToUser(request.customerId, 'support_ticket_note_added', eventData);
+    this.notificationsGateway.sendToFacility(request.facilityId, 'support_ticket_note_added', eventData);
+    this.notificationsGateway.broadcast('support_ticket_note_added', eventData);
 
     return {
       message: 'Đã gửi phản hồi thành công',
