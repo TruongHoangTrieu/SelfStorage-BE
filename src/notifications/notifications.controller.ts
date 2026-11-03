@@ -46,6 +46,16 @@ export class NotificationsController {
     return { unreadCount };
   }
 
+  @ApiOperation({ summary: "Xem chi tiết một thông báo kèm dữ liệu thực thể liên quan" })
+  @ApiParam({ name: "id", description: "ID thông báo" })
+  @ApiResponse({ status: 200, description: "Chi tiết thông báo" })
+  @Get(":id")
+  async findById(
+    @CurrentUser() user: any,
+    @Param("id") id: string,
+  ) {
+    return this.notificationsService.findById(user.id, id);
+  }
   @ApiOperation({ summary: 'Đánh dấu tất cả thông báo là đã đọc' })
   @ApiResponse({ status: 200, description: 'Đã đánh dấu tất cả là đã đọc' })
   @Patch('read-all')

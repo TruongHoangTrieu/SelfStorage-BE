@@ -210,6 +210,119 @@ export class NotificationsService {
   /**
    * Delete a notification
    */
+  /**
+   * Get single notification with live related entity details
+   */
+  async findById(userId: string, notificationId: string) {
+    const notification = await this.prisma.notification.findFirst({
+      where: {
+        id: notificationId,
+        userId,
+      },
+    });
+
+    if (!notification) {
+      throw new NotFoundException("Notification not found");
+    }
+
+    if (!notification.isRead) {
+      await this.prisma.notification.update({
+        where: { id: notificationId },
+        data: {
+          isRead: true,
+          readAt: new Date(),
+        },
+      });
+      notification.isRead = true;
+      const unreadCount = await this.getUnreadCount(userId);
+      this.gateway.sendToUser(userId, "unread_count", { unreadCount });
+    }
+
+    let relatedEntity: any = null;
+    const entityId = notification.entityId || (notification.metadata as any)?.entityId || (notification.metadata as any)?.paymentId || (notification.metadata as any)?.ticketId || (notification.metadata as any)?.contractId || (notification.metadata as any)?.reservationId;
+    const typeStr = String(notification.entityType || notification.type || '').toUpperCase();
+    const isObjectId = (val?: string) => typeof val === 'string' && /^[0-9a-fA-F]{24}$/.test(val);
+
+    if (entityId) {
+      try {
+        if (typeStr.includes('PAYMENT')) {
+          relatedEntity = await this.prisma.payment.findFirst({
+            where: isObjectId(entityId) ? { id: entityId } : { paymentCode: entityId },
+            include: {
+              reservation: {
+                include: {
+                  facility: true,
+                  items: {
+                    include: {
+                      unitType: true,
+                      unit: true,
+                    },
+                  },
+                },
+              },
+              contract: {
+                include: {
+                  contractItems: {
+                    include: { unit: true },
+                  },
+                },
+              },
+            },
+          });
+        } else if (typeStr.includes('SUPPORT')) {
+          relatedEntity = await this.prisma.supportRequest.findFirst({
+            where: isObjectId(entityId) ? { id: entityId } : { requestCode: entityId },
+            include: {
+              facility: true,
+              logs: {
+                include: {
+                  user: {
+                    select: {
+                      id: true,
+                      fullName: true,
+                      role: true,
+                    },
+                  },
+                },
+                orderBy: { createdAt: 'desc' },
+              },
+            },
+          });
+        } else if (typeStr.includes('RESERVATION')) {
+          relatedEntity = await this.prisma.reservation.findFirst({
+            where: isObjectId(entityId) ? { id: entityId } : { reservationCode: entityId },
+            include: {
+              facility: true,
+              items: {
+                include: {
+                  unitType: true,
+                  unit: true,
+                },
+              },
+              payments: true,
+            },
+          });
+        } else if (typeStr.includes('CONTRACT') || typeStr.includes('RENEWAL')) {
+          relatedEntity = await this.prisma.rentalContract.findFirst({
+            where: isObjectId(entityId) ? { id: entityId } : { contractCode: entityId },
+            include: {
+              contractItems: {
+                include: { unit: true },
+              },
+              payments: true,
+            },
+          });
+        }
+      } catch (e) {
+        relatedEntity = null;
+      }
+    }
+
+    return {
+      ...notification,
+      relatedEntity,
+    };
+  }
   async delete(userId: string, notificationId: string) {
     const notification = await this.prisma.notification.findFirst({
       where: {
