@@ -242,6 +242,7 @@ export class ContractsService {
     userRole: string,
     extendedMonths: number = 1,
     paymentMethod: string = 'SEPAY_QR',
+    explicitPaymentCode?: string,
   ) {
     const contract = await this.prisma.rentalContract.findUnique({
       where: { id: contractId },
@@ -297,7 +298,9 @@ export class ContractsService {
 
     // Tạo hoặc cập nhật giao dịch thanh toán gia hạn
     const cleanUnit = (contract.contractItems[0]?.unit?.unitNumber || 'UNIT').replace(/[^A-Za-z0-9]/g, '');
-    const paymentCode = `SSREN${cleanUnit}${extendedMonths}T`.toUpperCase();
+    const paymentCode = (explicitPaymentCode && explicitPaymentCode.trim())
+      ? explicitPaymentCode.trim().toUpperCase()
+      : `SSREN${cleanUnit}${extendedMonths}T`.toUpperCase();
 
     const existingPayment = await this.prisma.payment.findUnique({
       where: { paymentCode },

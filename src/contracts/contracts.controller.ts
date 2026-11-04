@@ -105,7 +105,7 @@ export class ContractsController {
   async renewContract(
     @Param('id') id: string,
     @CurrentUser() user: any,
-    @Body() body?: { extendedMonths?: number; paymentMethod?: string },
+    @Body() body?: { extendedMonths?: number; paymentMethod?: string; paymentCode?: string },
   ) {
     return this.contractsService.renewContract(
       id,
@@ -113,6 +113,7 @@ export class ContractsController {
       user.role,
       body?.extendedMonths || 1,
       body?.paymentMethod,
+      body?.paymentCode,
     );
   }
 

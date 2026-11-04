@@ -631,9 +631,9 @@ export class PaymentsService {
     // Tự động xử lý gia hạn hợp đồng trực tuyến nếu mã bắt đầu bằng SSREN
     if (!payment && paymentCode.toUpperCase().startsWith('SSREN')) {
       const rawCode = paymentCode.toUpperCase().replace(/^SSREN/, '');
-      const monthsMatch = rawCode.match(/(\d+)T$/);
+      const monthsMatch = rawCode.match(/(\d+)T/);
       const monthsToAdd = monthsMatch ? parseInt(monthsMatch[1], 10) : 1;
-      const unitCodeCandidate = rawCode.replace(/\d+T$/, '').trim();
+      const unitCodeCandidate = rawCode.replace(/_\d+T.*|\d+T.*/, '').trim();
 
       // 1. Thử tìm chính xác hoặc contains trước
       let matchedContractItem = await this.prisma.contractItem.findFirst({
