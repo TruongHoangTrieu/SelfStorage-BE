@@ -875,7 +875,15 @@ export class PaymentsService {
               id: true,
               reservationCode: true,
               customerId: true,
+              facilityId: true,
               status: true,
+              facility: {
+                select: {
+                  id: true,
+                  name: true,
+                  code: true,
+                },
+              },
             },
           },
           contract: {
@@ -884,6 +892,18 @@ export class PaymentsService {
               contractCode: true,
               customerId: true,
               status: true,
+              reservation: {
+                select: {
+                  facilityId: true,
+                  facility: {
+                    select: {
+                      id: true,
+                      name: true,
+                      code: true,
+                    },
+                  },
+                },
+              },
             },
           },
         },

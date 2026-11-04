@@ -206,4 +206,31 @@ export class OperationsController {
   async validateDiscountCode(@Param('code') code: string) {
     return this.operationsService.validateDiscountCode(code);
   }
+
+  // ==================== SYSTEM ANALYTICS & REPORTS ====================
+
+  @ApiOperation({ summary: 'Báo cáo doanh thu & tỷ lệ lấp đầy đa chi nhánh toàn hệ thống' })
+  @ApiResponse({ status: 200, description: 'Dữ liệu doanh thu và hiệu suất các chi nhánh' })
+  @Public()
+  @Get('analytics/multi-branch')
+  async getMultiBranchAnalytics() {
+    return this.operationsService.getMultiBranchAnalytics();
+  }
+
+  @ApiOperation({ summary: 'Báo cáo hợp đồng toàn hệ thống phục vụ xuất CSV và giám sát vận hành' })
+  @ApiResponse({ status: 200, description: 'Danh sách toàn bộ hợp đồng kèm thông tin cơ sở' })
+  @Public()
+  @Get('reports/contracts')
+  async getReportContracts() {
+    return this.operationsService.getReportContracts();
+  }
+
+  @ApiOperation({ summary: 'Thanh lý hợp đồng quá hạn & giải phóng ô kho trở lại khả dụng' })
+  @ApiParam({ name: 'id', description: 'ID hợp đồng cần thanh lý' })
+  @ApiResponse({ status: 200, description: 'Thanh lý hợp đồng và giải phóng ô kho thành công' })
+  @Public()
+  @Patch('contracts/:id/terminate')
+  async terminateOverdueContract(@Param('id') id: string) {
+    return this.operationsService.terminateOverdueContract(id);
+  }
 }
