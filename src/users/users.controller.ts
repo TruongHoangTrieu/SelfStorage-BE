@@ -12,11 +12,10 @@ import {
   HttpStatus,
   BadRequestException,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
-import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import { UserRole } from '../common/enums/role.enum';
@@ -72,7 +71,7 @@ export class UsersController {
     return this.usersService.getLoginHistory({ limit: lim, userId });
   }
 
-  @ApiOperation({ summary: 'Tạo tài khoản người dùng mới (Admin)' })
+  @ApiOperation({ summary: 'Tạo tài khoản người dùng mới và cấp quyền ban đầu (Admin)' })
   @Public()
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -85,11 +84,27 @@ export class UsersController {
       password?: string;
       roleName: string;
       facilityId?: string;
+      reason?: string;
     },
     @CurrentUser() adminUser: any,
   ) {
+    if (adminUser?.role === UserRole.BUSINESS_OPERATIONS_MANAGER) {
+      throw new BadRequestException(
+        'Chỉ Quản trị viên hệ thống (SYSTEM_ADMINISTRATOR) mới có quyền khởi tạo tài khoản mới.',
+      );
+    }
+
     if (!body.email || !body.fullName || !body.roleName) {
       throw new BadRequestException('Vui lòng cung cấp đầy đủ họ tên, email và vai trò');
+    }
+
+    const isFacilityScopedRole =
+      body.roleName === UserRole.FACILITY_STAFF || body.roleName === UserRole.FACILITY_MANAGER;
+
+    if (isFacilityScopedRole && !body.facilityId) {
+      throw new BadRequestException(
+        'Vai trò Nhân viên vận hành và Quản lý chi nhánh bắt buộc phải chọn cơ sở kho trực thuộc',
+      );
     }
 
     const existing = await this.usersService.findByEmail(body.email);
@@ -100,6 +115,7 @@ export class UsersController {
     const role = await this.usersService.findRoleByName(body.roleName);
     const password = body.password || 'Storage@2026';
     const passwordHash = await bcrypt.hash(password, 10);
+    const actorId = adminUser?.id || '6ac4e8ad2edd770fa05d7265';
 
     const newUser = await this.usersService.createUser({
       fullName: body.fullName,
@@ -110,30 +126,61 @@ export class UsersController {
       status: UserStatus.ACTIVE,
     });
 
-    if (body.facilityId) {
-      await this.usersService.assignFacilityAccess(
+    let facilityLogInfo = ' | Phạm vi: Toàn hệ thống (Global)';
+
+    if (isFacilityScopedRole && body.facilityId) {
+      if (body.roleName === UserRole.FACILITY_MANAGER) {
+        await this.usersService.endExistingManagersAtFacility(body.facilityId, newUser.id);
+      }
+
+      const assignment = await this.usersService.assignFacilityAccess(
         newUser.id,
         body.facilityId,
-        body.roleName.includes('MANAGER') ? 'MANAGER' : 'STAFF',
-        adminUser?.id || '6ac4e8ad2edd770fa05d7265',
+        body.roleName === UserRole.FACILITY_MANAGER ? 'MANAGER' : 'STAFF',
       );
+      const facName = (assignment as any)?.facility?.name || body.facilityId;
+      facilityLogInfo = ` | Cơ sở: ${facName}`;
     }
 
-    return this.usersService.sanitizeUser(newUser);
+    const reasonInfo = body.reason?.trim() ? ` | Ghi chú: ${body.reason.trim()}` : '';
+    await this.usersService.logActivity({
+      userId: actorId,
+      action: 'CREATE_USER',
+      entityType: 'USER',
+      entityId: newUser.id,
+      description: `Khởi tạo tài khoản ${newUser.email} (${newUser.fullName}) | Vai trò: [${body.roleName}]${facilityLogInfo}${reasonInfo}`,
+    });
+
+    const fullUser = await this.usersService.findById(newUser.id);
+    return this.usersService.sanitizeUser(fullUser || newUser);
   }
 
-  @ApiOperation({ summary: 'Thay đổi vai trò người dùng (Admin)' })
+  @ApiOperation({ summary: 'Thay đổi vai trò người dùng và tự động đồng bộ phạm vi cơ sở (Admin)' })
   @Public()
   @Patch(':id/role')
   async updateUserRole(
     @Param('id') userId: string,
-    @Body('roleName') roleName: string,
+    @Body()
+    body: {
+      roleName: string;
+      facilityId?: string;
+      reason?: string;
+    },
     @CurrentUser() adminUser: any,
   ) {
-    if (!roleName) {
+    if (!body?.roleName) {
       throw new BadRequestException('Vui lòng cung cấp tên vai trò roleName');
     }
-    return this.usersService.updateUserRole(userId, roleName, adminUser?.id || '6ac4e8ad2edd770fa05d7265');
+    return this.usersService.updateUserRole(
+      userId,
+      body.roleName,
+      adminUser?.id || '6ac4e8ad2edd770fa05d7265',
+      {
+        facilityId: body.facilityId,
+        reason: body.reason,
+        actorRole: adminUser?.role,
+      },
+    );
   }
 
   @ApiOperation({ summary: 'Cập nhật trạng thái người dùng (Khóa / Mở khóa)' })
@@ -179,4 +226,3 @@ export class UsersController {
     return this.usersService.removeFacilityAccess(userId, adminUser?.id || '6ac4e8ad2edd770fa05d7265');
   }
 }
-

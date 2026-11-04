@@ -144,6 +144,48 @@ export class UsersService implements OnModuleInit {
     });
   }
 
+  async logActivity(params: {
+    userId: string;
+    action: string;
+    entityType: string;
+    entityId: string;
+    description: string;
+  }) {
+    await this.prisma.activityLog
+      .create({
+        data: params,
+      })
+      .catch(() => {});
+  }
+
+  async endExistingManagersAtFacility(facilityId: string, excludeUserId?: string) {
+    const now = new Date();
+    const activeAssignments = await this.prisma.staffFacilityAssignment.findMany({
+      where: {
+        facilityId,
+        OR: [{ endedAt: null }, { endedAt: { gt: now } }],
+      },
+      include: {
+        user: {
+          include: { role: true },
+        },
+      },
+    });
+
+    for (const assignment of activeAssignments) {
+      if (excludeUserId && String(assignment.userId) === String(excludeUserId)) {
+        continue;
+      }
+      const userRoleName = assignment.user?.role?.name || '';
+      if (assignment.position === 'MANAGER' || userRoleName === UserRole.FACILITY_MANAGER) {
+        await this.prisma.staffFacilityAssignment.update({
+          where: { id: assignment.id },
+          data: { endedAt: now },
+        });
+      }
+    }
+  }
+
   async updateLastLogin(id: string) {
     const updated = await this.prisma.user.update({
       where: { id },
@@ -253,11 +295,17 @@ export class UsersService implements OnModuleInit {
       sanitized.maskedIdentityNumber = maskCccd(sanitized.identityNumber);
     }
 
-    // Resolve active assigned facility for staff and manager
+    // Resolve active assigned facility for staff and manager (only for facility-scoped roles)
     let facilityId: string | null = null;
     let assignedFacility: any = null;
+    const isFacilityScopedRole =
+      roleName === UserRole.FACILITY_STAFF || roleName === UserRole.FACILITY_MANAGER;
 
-    if (Array.isArray(staffFacilityAssignments) && staffFacilityAssignments.length > 0) {
+    if (
+      isFacilityScopedRole &&
+      Array.isArray(staffFacilityAssignments) &&
+      staffFacilityAssignments.length > 0
+    ) {
       const now = new Date();
       const activeAssignment = staffFacilityAssignments.find(
         (a: any) => !a.endedAt || new Date(a.endedAt) >= now,
@@ -327,32 +375,133 @@ export class UsersService implements OnModuleInit {
     });
   }
 
-  async updateUserRole(userId: string, roleName: string, actorId?: string) {
-    const role = await this.findRoleByName(roleName);
-    const updated = await this.prisma.user.update({
-      where: { id: userId },
-      data: { roleId: role.id },
-      include: {
-        role: true,
-        staffFacilityAssignments: {
-          include: { facility: true },
-        },
-      },
-    });
-
-    if (actorId) {
-      await this.prisma.activityLog.create({
-        data: {
-          userId: actorId,
-          action: 'UPDATE_ROLE',
-          entityType: 'USER',
-          entityId: userId,
-          description: `Gán vai trò mới: ${roleName} cho người dùng ${updated.email}`,
-        },
-      }).catch(() => {});
+  async updateUserRole(
+    userId: string,
+    roleName: string,
+    actorId?: string,
+    options?: { facilityId?: string; reason?: string; actorRole?: string },
+  ) {
+    const existingUser = await this.findById(userId);
+    if (!existingUser) {
+      throw new NotFoundException('Không tìm thấy tài khoản người dùng');
     }
 
-    return this.sanitizeUser(updated);
+    const oldRoleName = existingUser.role?.name || UserRole.STORAGE_CUSTOMER;
+
+    // Ràng buộc phân cấp cho BUSINESS_OPERATIONS_MANAGER: Chỉ được quản lý & chuyển đổi giữa FACILITY_STAFF <-> FACILITY_MANAGER
+    if (options?.actorRole === UserRole.BUSINESS_OPERATIONS_MANAGER) {
+      const allowedBranchRoles = [UserRole.FACILITY_STAFF, UserRole.FACILITY_MANAGER] as string[];
+      if (!allowedBranchRoles.includes(oldRoleName) || !allowedBranchRoles.includes(roleName)) {
+        throw new BadRequestException(
+          'Quản lý vận hành chuỗi (Business Operations Manager) chỉ được phép điều chuyển vai trò giữa Nhân viên cơ sở (FACILITY_STAFF) và Quản lý chi nhánh (FACILITY_MANAGER).',
+        );
+      }
+    }
+
+    // 1. Chặn tự hạ quyền chính tài khoản Admin đang đăng nhập
+    if (
+      actorId &&
+      String(actorId) === String(userId) &&
+      oldRoleName === UserRole.SYSTEM_ADMINISTRATOR &&
+      roleName !== UserRole.SYSTEM_ADMINISTRATOR
+    ) {
+      throw new BadRequestException(
+        'Bạn không thể tự hạ quyền Quản trị viên hệ thống của chính tài khoản đang đăng nhập',
+      );
+    }
+
+    // 2. Bảo vệ tài khoản Khách hàng đang có hợp đồng thuê kho ACTIVE
+    if (
+      oldRoleName === UserRole.STORAGE_CUSTOMER &&
+      roleName !== UserRole.STORAGE_CUSTOMER
+    ) {
+      const activeContractsCount = await this.prisma.rentalContract
+        .count({
+          where: {
+            customerId: userId,
+            status: 'ACTIVE' as any,
+          },
+        })
+        .catch(() => 0);
+
+      if (activeContractsCount > 0) {
+        throw new BadRequestException(
+          `Tài khoản khách hàng này đang có ${activeContractsCount} hợp đồng thuê kho hiệu lực. Vui lòng tạo tài khoản công vụ riêng thay vì chuyển đổi trực tiếp.`,
+        );
+      }
+    }
+
+    const role = await this.findRoleByName(roleName);
+
+    // Xác định cơ sở hiện tại của user (nếu có)
+    const now = new Date();
+    const currentActiveAssignment = existingUser.staffFacilityAssignments?.find(
+      (a: any) => !a.endedAt || new Date(a.endedAt) >= now,
+    );
+    const currentFacilityId = currentActiveAssignment?.facilityId || null;
+
+    const isTargetFacilityScoped =
+      roleName === UserRole.FACILITY_STAFF || roleName === UserRole.FACILITY_MANAGER;
+
+    let resolvedFacilityName = '';
+
+    // 3. Tự động đồng bộ / thu hồi quyền cơ sở theo Role mới
+    if (isTargetFacilityScoped) {
+      const targetFacilityId = options?.facilityId || currentFacilityId;
+      if (!targetFacilityId) {
+        throw new BadRequestException(
+          'Vai trò Nhân viên vận hành và Quản lý chi nhánh bắt buộc phải chọn cơ sở kho trực thuộc',
+        );
+      }
+
+      if (roleName === UserRole.FACILITY_MANAGER) {
+        await this.endExistingManagersAtFacility(targetFacilityId, userId);
+      }
+
+      const assignment = await this.assignFacilityAccess(
+        userId,
+        targetFacilityId,
+        roleName === UserRole.FACILITY_MANAGER ? 'MANAGER' : 'STAFF',
+      );
+      resolvedFacilityName = (assignment as any)?.facility?.name || targetFacilityId;
+    } else {
+      // Nếu chuyển sang Role toàn chuỗi (BUSINESS_OPERATIONS_MANAGER / SYSTEM_ADMINISTRATOR) hoặc STORAGE_CUSTOMER -> Thu hồi toàn bộ phân công cơ sở lẻ cũ
+      await this.prisma.staffFacilityAssignment.updateMany({
+        where: {
+          userId,
+          OR: [{ endedAt: null }, { endedAt: { gt: now } }],
+        },
+        data: {
+          endedAt: now,
+        },
+      });
+    }
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { roleId: role.id },
+    });
+
+    const reloaded = await this.findById(userId);
+
+    if (actorId) {
+      const scopeDesc = isTargetFacilityScoped
+        ? ` | Cơ sở: ${resolvedFacilityName}`
+        : ' | Phạm vi: Toàn hệ thống (Global)';
+      const reasonDesc = options?.reason?.trim()
+        ? ` | Lý do: ${options.reason.trim()}`
+        : '';
+
+      await this.logActivity({
+        userId: actorId,
+        action: 'UPDATE_ROLE',
+        entityType: 'USER',
+        entityId: userId,
+        description: `Đổi vai trò cho ${existingUser.email}: [${oldRoleName}] -> [${roleName}]${scopeDesc}${reasonDesc}`,
+      });
+    }
+
+    return this.sanitizeUser(reloaded);
   }
 
   async updateUserStatus(userId: string, status: UserStatus, actorId?: string) {
@@ -384,6 +533,9 @@ export class UsersService implements OnModuleInit {
 
   async assignFacilityAccess(userId: string, facilityId: string, roleInFacility = 'STAFF', actorId?: string) {
     const now = new Date();
+    if (roleInFacility === 'MANAGER') {
+      await this.endExistingManagersAtFacility(facilityId, userId);
+    }
     await this.prisma.staffFacilityAssignment.updateMany({
       where: {
         userId,
@@ -470,6 +622,7 @@ export class UsersService implements OnModuleInit {
       take: params?.limit || 50,
     });
   }
+
   async getLoginHistory(params?: { limit?: number; userId?: string }) {
     const usersWithLogin = await this.prisma.user.findMany({
       where: {
