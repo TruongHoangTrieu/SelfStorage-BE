@@ -18,6 +18,9 @@ import {
   ContractStatus,
   AccessCodeStatus,
   StorageUnitStatus,
+  PaymentType,
+  PaymentStatus,
+  PaymentMethod,
 } from '@prisma/client';
 import { UserRole } from '../common/enums/role.enum';
 
@@ -228,6 +231,110 @@ export class ContractsService {
 
       return updated;
     });
+  }
+
+    /**
+   * Gia hạn thời gian thuê của hợp đồng
+   */
+  async renewContract(
+    contractId: string,
+    userId: string,
+    userRole: string,
+    extendedMonths: number = 1,
+    paymentMethod: string = 'SEPAY_QR',
+  ) {
+    const contract = await this.prisma.rentalContract.findUnique({
+      where: { id: contractId },
+      include: {
+        customer: true,
+        contractItems: {
+          include: {
+            unit: { include: { unitType: true } },
+          },
+        },
+      },
+    });
+
+    if (!contract) {
+      throw new NotFoundException(`Hợp đồng #${contractId} không tồn tại`);
+    }
+
+    const roleName = typeof userRole === 'string' ? userRole : (userRole as any)?.name;
+    if (roleName === UserRole.STORAGE_CUSTOMER && contract.customerId !== userId) {
+      throw new ForbiddenException('Bạn không có quyền thao tác trên hợp đồng này');
+    }
+
+    if (
+      contract.status === ContractStatus.TERMINATED ||
+      contract.status === ContractStatus.CANCELLED
+    ) {
+      throw new BadRequestException('Hợp đồng đã kết thúc hoặc bị hủy, không thể gia hạn');
+    }
+
+    const currentEnd = new Date(contract.endDate);
+    const baseDate = currentEnd.getTime() > Date.now() ? currentEnd : new Date();
+    const newEnd = new Date(baseDate.getTime());
+    newEnd.setMonth(newEnd.getMonth() + extendedMonths);
+
+    // Tính toán số tiền gia hạn
+    let totalRenewalAmount = 0;
+    for (const item of contract.contractItems) {
+      const pricePerMonth = Number(item.rentalPrice || 0);
+      totalRenewalAmount += pricePerMonth * extendedMonths;
+    }
+
+    const updated = await this.prisma.rentalContract.update({
+      where: { id: contractId },
+      data: {
+        endDate: newEnd,
+        status: ContractStatus.ACTIVE,
+      },
+      include: {
+        customer: true,
+        contractItems: { include: { unit: true } },
+      },
+    });
+
+    // Tạo hoặc cập nhật giao dịch thanh toán gia hạn
+    const cleanUnit = (contract.contractItems[0]?.unit?.unitNumber || 'UNIT').replace(/[^A-Za-z0-9]/g, '');
+    const paymentCode = `SSREN${cleanUnit}${extendedMonths}T`.toUpperCase();
+
+    const existingPayment = await this.prisma.payment.findUnique({
+      where: { paymentCode },
+    });
+
+    if (existingPayment) {
+      if (existingPayment.status !== PaymentStatus.PAID) {
+        await this.prisma.payment.update({
+          where: { id: existingPayment.id },
+          data: {
+            status: PaymentStatus.PAID,
+            paidAt: new Date(),
+          },
+        });
+      }
+    } else {
+      await this.prisma.payment.create({
+        data: {
+          paymentCode,
+          contractId,
+          paymentType: PaymentType.RENEWAL,
+          amount: totalRenewalAmount > 0 ? totalRenewalAmount : 20000,
+          paymentMethod: paymentMethod === 'CASH' ? PaymentMethod.CASH : PaymentMethod.BANK_TRANSFER,
+          status: PaymentStatus.PAID,
+          paidAt: new Date(),
+        },
+      });
+    }
+
+    return {
+      success: true,
+      contractId: updated.id,
+      extendedMonths,
+      newEndDate: updated.endDate,
+      status: updated.status,
+      totalRenewalAmount,
+    };
   }
 
   // ==================== KHÓA THÔNG MINH CĂN HỘ (SMART DIGITAL LOCK) ====================

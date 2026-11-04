@@ -98,6 +98,24 @@ export class ContractsController {
     return this.contractsService.signContract(id, user.id, body?.signature);
   }
 
+  @ApiOperation({ summary: 'Gia hạn thời gian thuê của hợp đồng' })
+  @ApiParam({ name: 'id', description: 'ID hợp đồng' })
+  @ApiResponse({ status: 200, description: 'Gia hạn hợp đồng thành công' })
+  @Post(':id/renew')
+  async renewContract(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body() body?: { extendedMonths?: number; paymentMethod?: string },
+  ) {
+    return this.contractsService.renewContract(
+      id,
+      user.id,
+      user.role,
+      body?.extendedMonths || 1,
+      body?.paymentMethod,
+    );
+  }
+
   @ApiOperation({ summary: 'Thanh lý / Chấm dứt hợp đồng và giải phóng ngăn kho (Manager / Admin)' })
   @ApiParam({ name: 'id', description: 'ID hợp đồng' })
   @ApiResponse({ status: 200, description: 'Thanh lý hợp đồng thành công' })

@@ -635,7 +635,8 @@ export class PaymentsService {
       const monthsToAdd = monthsMatch ? parseInt(monthsMatch[1], 10) : 1;
       const unitCodeCandidate = rawCode.replace(/\d+T$/, '').trim();
 
-      const matchedContractItem = await this.prisma.contractItem.findFirst({
+      // 1. Thử tìm chính xác hoặc contains trước
+      let matchedContractItem = await this.prisma.contractItem.findFirst({
         where: {
           unit: {
             unitNumber: {
@@ -653,6 +654,34 @@ export class PaymentsService {
         },
         orderBy: { createdAt: 'desc' },
       });
+
+      // 2. Fallback: Normalized match loại bỏ dấu gạch ngang '-', '_', khoảng trắng
+      if (!matchedContractItem) {
+        const cleanCandidate = unitCodeCandidate.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+        const activeItems = await this.prisma.contractItem.findMany({
+          where: {
+            contract: {
+              status: { in: [ContractStatus.ACTIVE, ContractStatus.OVERDUE] },
+            },
+          },
+          include: {
+            contract: true,
+            unit: true,
+          },
+          orderBy: { createdAt: 'desc' },
+        });
+
+        matchedContractItem = activeItems.find((item) => {
+          const cleanNum = (item.unit?.unitNumber || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+          return (
+            cleanNum === cleanCandidate ||
+            cleanNum.endsWith(cleanCandidate) ||
+            cleanCandidate.endsWith(cleanNum) ||
+            cleanNum.includes(cleanCandidate) ||
+            cleanCandidate.includes(cleanNum)
+          );
+        }) || null;
+      }
 
       if (matchedContractItem && matchedContractItem.contract) {
         const contract = matchedContractItem.contract;
