@@ -96,11 +96,8 @@ export class AuthController {
   }
 
   private clearAuthCookie(response: Response) {
-    const options = this.getCookieOptions();
-    response.clearCookie('token', {
-      ...options,
-      maxAge: 0,
-    });
+    const { maxAge: _maxAge, ...clearOptions } = this.getCookieOptions();
+    response.clearCookie('token', clearOptions);
   }
 
   @ApiOperation({ summary: 'Đăng ký tài khoản khách hàng mới' })
@@ -287,7 +284,6 @@ export class AuthController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Đăng xuất khỏi hệ thống' })
   @ApiResponse({ status: 200, description: 'Đăng xuất thành công' })
-  @UseGuards(JwtAuthGuard)
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   async logout(
@@ -295,7 +291,7 @@ export class AuthController {
     @Res({ passthrough: true }) response: Response,
   ) {
     this.clearAuthCookie(response);
-    return this.authService.logout(user.id);
+    return this.authService.logout(user?.id || 'session');
   }
 
   @ApiBearerAuth('JWT-auth')
