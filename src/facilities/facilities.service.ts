@@ -232,14 +232,11 @@ export class FacilitiesService {
       // 2. Tra cứu trong bảng StaffFacilityAssignment để đảm bảo chính xác
       const userId = user.id || user.sub;
       if (userId) {
-        const assignment = await this.prisma.staffFacilityAssignment.findFirst({
-          where: {
-            userId,
-            facilityId,
-            endedAt: null,
-          },
+        const assignments = await this.prisma.staffFacilityAssignment.findMany({
+          where: { userId, facilityId },
         });
-        if (assignment) {
+        const active = assignments.find((a) => !a.endedAt || new Date(a.endedAt) >= new Date());
+        if (active) {
           return;
         }
       }
@@ -335,13 +332,13 @@ export class FacilitiesService {
     }
 
     // Kiểm tra nhân viên đã được phân công tại cơ sở này chưa (chưa kết thúc)
-    const existingActive = await this.prisma.staffFacilityAssignment.findFirst({
+    const assignments = await this.prisma.staffFacilityAssignment.findMany({
       where: {
         userId: dto.userId,
         facilityId: facilityId,
-        endedAt: null,
       },
     });
+    const existingActive = assignments.find((a) => !a.endedAt || new Date(a.endedAt) >= new Date());
     if (existingActive) {
       throw new ConflictException(
         `User '${user.fullName}' is already assigned to this facility as '${existingActive.position}'`,
