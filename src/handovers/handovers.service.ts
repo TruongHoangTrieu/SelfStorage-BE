@@ -84,28 +84,23 @@ export class HandoversService {
       roleUpper === 'OPERATIONS_STAFF'
     ) {
       const now = new Date();
-      const assignment = await this.prisma.staffFacilityAssignment.findFirst({
-        where: {
-          userId,
-          facilityId,
-          OR: [{ endedAt: null }, { endedAt: { gte: now } }],
-        },
+      const userAssignments = await this.prisma.staffFacilityAssignment.findMany({
+        where: { userId },
       });
 
-      if (!assignment) {
-        const anyAssignment = await this.prisma.staffFacilityAssignment.findFirst({
-          where: {
-            userId,
-            OR: [{ endedAt: null }, { endedAt: { gte: now } }],
-          },
-        });
-        if (!anyAssignment) {
-          this.logger.warn(
-            `Staff ${userId} has no strict facility assignment. Allowing access to facility '${facilityName || facilityId}' for demo/testing.`,
-          );
-          return;
-        }
+      const activeAssignments = userAssignments.filter(
+        (a) => !a.endedAt || new Date(a.endedAt) >= now,
+      );
 
+      if (activeAssignments.length === 0) {
+        this.logger.warn(
+          `Staff ${userId} has no strict facility assignment. Allowing access to facility '${facilityName || facilityId}' for demo/testing.`,
+        );
+        return;
+      }
+
+      const match = activeAssignments.find((a) => a.facilityId === facilityId);
+      if (!match) {
         throw new ForbiddenException(
           `Staff is not assigned to facility '${facilityName || facilityId}'`,
         );
