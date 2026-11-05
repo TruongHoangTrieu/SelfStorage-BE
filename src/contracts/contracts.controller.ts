@@ -29,6 +29,7 @@ import {
   ResetSmartLockPinDto,
   UpdateSmartLockStatusDto,
 } from './dto/smart-lock.dto';
+import { CreateReturnRequestDto } from './dto/return-request.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -115,6 +116,19 @@ export class ContractsController {
       body?.paymentMethod,
       body?.paymentCode,
     );
+  }
+
+  @ApiOperation({ summary: 'Khách hàng gửi yêu cầu trả kho kèm ngày & khung giờ bàn giao' })
+  @ApiParam({ name: 'id', description: 'ID hợp đồng' })
+  @ApiResponse({ status: 201, description: 'Gửi yêu cầu trả kho thành công' })
+  @Roles(UserRole.STORAGE_CUSTOMER)
+  @Post(':id/return-request')
+  async createReturnRequest(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body() dto: CreateReturnRequestDto,
+  ) {
+    return this.contractsService.createReturnRequest(id, user.id, dto);
   }
 
   @ApiOperation({ summary: 'Thanh lý / Chấm dứt hợp đồng và giải phóng ngăn kho (Manager / Admin)' })

@@ -14,6 +14,7 @@ import {
   ResetSmartLockPinDto,
   UpdateSmartLockStatusDto,
 } from './dto/smart-lock.dto';
+import { CreateReturnRequestDto } from './dto/return-request.dto';
 import {
   ContractStatus,
   AccessCodeStatus,
@@ -189,6 +190,52 @@ export class ContractsService {
         signedAt: new Date(),
         customerSignature: signature || undefined,
         status: ContractStatus.ACTIVE,
+      },
+    });
+  }
+
+  /**
+   * Khách hàng gửi yêu cầu trả kho kèm ngày & khung giờ bàn giao.
+   * Nhân viên đọc lại thông tin này qua API danh sách hợp đồng.
+   */
+  async createReturnRequest(
+    contractId: string,
+    userId: string,
+    dto: CreateReturnRequestDto,
+  ) {
+    const contract = await this.prisma.rentalContract.findUnique({
+      where: { id: contractId },
+    });
+
+    if (!contract) {
+      throw new NotFoundException(`Hợp đồng #${contractId} không tồn tại`);
+    }
+
+    if (contract.customerId !== userId) {
+      throw new ForbiddenException('Bạn không phải là chủ sở hữu hợp đồng này');
+    }
+
+    if (
+      contract.status === ContractStatus.COMPLETED ||
+      contract.status === ContractStatus.TERMINATED ||
+      contract.status === ContractStatus.CANCELLED
+    ) {
+      throw new BadRequestException(
+        'Hợp đồng đã kết thúc, không thể gửi yêu cầu trả kho',
+      );
+    }
+
+    const returnDate = new Date(dto.returnDate);
+    if (Number.isNaN(returnDate.getTime())) {
+      throw new BadRequestException('Ngày trả kho không hợp lệ');
+    }
+
+    return this.prisma.rentalContract.update({
+      where: { id: contractId },
+      data: {
+        returnRequestedAt: new Date(),
+        returnDate,
+        returnTimeSlot: dto.returnTimeSlot,
       },
     });
   }

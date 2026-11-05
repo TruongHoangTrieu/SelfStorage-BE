@@ -447,6 +447,11 @@ model RentalContract {
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")
 
+  // Thông tin khách đăng ký trả kho (khách gửi từ app)
+  returnRequestedAt DateTime? @map("return_requested_at")
+  returnDate        DateTime? @map("return_date")
+  returnTimeSlot    String?   @map("return_time_slot")
+
   // Identity snapshot at contract signing time
   customerIdentityType     IdentityType? @map("customer_identity_type")
   customerIdentityNumber   String?       @map("customer_identity_number")

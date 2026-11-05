@@ -403,7 +403,13 @@ export class ReservationsService {
       // Nhân viên chỉ tiếp nhận khách hàng đã cọc (CONFIRMED, IN_PROGRESS, COMPLETED...).
       // Không đưa đơn PENDING chưa thanh toán cọc vào danh sách của nhân viên.
       if (!filter.status) {
-        where.status = { not: ReservationStatus.PENDING };
+        where.status = {
+          notIn: [
+            ReservationStatus.PENDING,
+            ReservationStatus.CANCELLED,
+            ReservationStatus.EXPIRED,
+          ],
+        };
       }
     } else {
       // Admin / Ops Manager: Có thể xem toàn bộ hoặc lọc theo customer / facility
