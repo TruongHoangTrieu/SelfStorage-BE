@@ -33,10 +33,30 @@ export class OperationsService {
       }
     }
 
-    return this.prisma.policy.create({
+    const normalizedType = dto.policyType.toUpperCase();
+
+    // Lưu chính sách mới và hủy kích hoạt bản cũ cùng loại để tránh xung đột (lọc JS an toàn cho MongoDB Prisma)
+    const activePoliciesOfType = await this.prisma.policy.findMany({
+      where: {
+        policyType: normalizedType,
+        status: 'ACTIVE',
+      },
+    });
+    const idsToDeactivate = activePoliciesOfType
+      .filter((p) => (dto.facilityId ? p.facilityId === dto.facilityId : !p.facilityId))
+      .map((p) => p.id);
+
+    if (idsToDeactivate.length > 0) {
+      await this.prisma.policy.updateMany({
+        where: { id: { in: idsToDeactivate } },
+        data: { status: 'INACTIVE' },
+      });
+    }
+
+    const created = await this.prisma.policy.create({
       data: {
-        facilityId: dto.facilityId,
-        policyType: dto.policyType.toUpperCase(),
+        facilityId: dto.facilityId ?? null,
+        policyType: normalizedType,
         name: dto.name,
         description: dto.description,
         value: dto.value,
@@ -46,6 +66,39 @@ export class OperationsService {
         status: dto.status || 'ACTIVE',
       },
     });
+
+    // Đồng bộ lại tiền cọc trên toàn bộ loại kho dựa theo % tiền thuê khi cập nhật DEPOSIT policy
+    if (normalizedType === 'DEPOSIT') {
+      const rawPercent = Number(
+        dto.value?.depositPercent ?? dto.value?.reservation_deposit_percent ?? 25,
+      );
+      if (Number.isFinite(rawPercent) && rawPercent > 0) {
+        const unitTypes = await this.prisma.storageUnitType.findMany({
+          where: dto.facilityId ? { facilityId: dto.facilityId } : undefined,
+          include: {
+            pricingRules: {
+              orderBy: { effectiveFrom: 'desc' },
+              take: 1,
+            },
+          },
+        });
+
+        await Promise.all(
+          unitTypes.map((ut) => {
+            const activePrice = ut.pricingRules?.[0]?.price
+              ? Number(ut.pricingRules[0].price)
+              : Number(ut.depositAmount);
+            const newDeposit = Math.round(activePrice * (rawPercent / 100));
+            return this.prisma.storageUnitType.update({
+              where: { id: ut.id },
+              data: { depositAmount: newDeposit },
+            });
+          }),
+        );
+      }
+    }
+
+    return created;
   }
 
   async getPolicies(policyType?: string, facilityId?: string) {

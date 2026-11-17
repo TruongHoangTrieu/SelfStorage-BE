@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  BadRequestException,
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
@@ -14,6 +15,50 @@ export class StorageUnitTypesService {
   private readonly logger = new Logger(StorageUnitTypesService.name);
 
   constructor(private readonly prisma: PrismaService) {}
+
+  private async getActiveDepositPercent(facilityId?: string): Promise<number> {
+    const policies = await this.prisma.policy.findMany({
+      where: {
+        policyType: 'DEPOSIT',
+        status: 'ACTIVE',
+      },
+      orderBy: { effectiveFrom: 'desc' },
+    });
+
+    const specific = facilityId
+      ? policies.find((p) => p.facilityId === facilityId)
+      : null;
+    const global = policies.find((p) => !p.facilityId);
+    const chosen = specific || global || policies[0];
+    const val: any = chosen?.value || {};
+    const rawPercent = Number(
+      val.depositPercent ?? val.reservation_deposit_percent ?? 25,
+    );
+    return Number.isFinite(rawPercent) && rawPercent > 0 ? rawPercent : 25;
+  }
+
+  private async getFacilityAreaMetrics(facilityId: string) {
+    const [facility, units] = await Promise.all([
+      this.prisma.facility.findUnique({ where: { id: facilityId } }),
+      this.prisma.storageUnit.findMany({
+        where: { facilityId },
+        include: { unitType: { select: { size: true } } },
+      }),
+    ]);
+    const usedArea = Number(
+      units
+        .reduce((sum, u) => sum + (Number(u.unitType?.size) || 0), 0)
+        .toFixed(2),
+    );
+    const totalArea = Number(
+      (facility as any)?.totalArea ?? Math.max(300, Math.ceil(usedArea * 1.5)),
+    );
+    const remainingArea = Math.max(
+      0,
+      Number((totalArea - usedArea).toFixed(2)),
+    );
+    return { totalArea, usedArea, remainingArea };
+  }
 
   async findAll(facilityId?: string) {
     const whereClause: any = {};
@@ -58,27 +103,63 @@ export class StorageUnitTypesService {
       orderBy: { createdAt: 'asc' },
     });
 
-    // Add availability count and active price for each unit type
+    // Add availability count, computed deposit from policy %, and facility area metrics
+    const metricsCache = new Map<string, Promise<any>>();
+    const percentCache = new Map<string, Promise<number>>();
+
     const unitTypesWithAvailability = await Promise.all(
       unitTypes.map(async (unitType) => {
-        const availableUnits = await this.prisma.storageUnit.count({
-          where: {
-            unitTypeId: unitType.id,
-            status: StorageUnitStatus.AVAILABLE,
-          },
-        });
+        if (!metricsCache.has(unitType.facilityId)) {
+          metricsCache.set(
+            unitType.facilityId,
+            this.getFacilityAreaMetrics(unitType.facilityId),
+          );
+        }
+        if (!percentCache.has(unitType.facilityId)) {
+          percentCache.set(
+            unitType.facilityId,
+            this.getActiveDepositPercent(unitType.facilityId),
+          );
+        }
+
+        const [availableUnits, areaMetrics, depositPercent] = await Promise.all([
+          this.prisma.storageUnit.count({
+            where: {
+              unitTypeId: unitType.id,
+              status: StorageUnitStatus.AVAILABLE,
+            },
+          }),
+          metricsCache.get(unitType.facilityId),
+          percentCache.get(unitType.facilityId),
+        ]);
 
         const activePrice = unitType.pricingRules?.[0]?.price
           ? Number(unitType.pricingRules[0].price)
           : Number(unitType.depositAmount);
 
+        const computedDepositAmount = Math.round(
+          activePrice * ((depositPercent || 25) / 100),
+        );
+        const unitSize = Number(unitType.size) || 0;
+        const maxTotalUnitsAtSize =
+          unitSize > 0 ? Math.floor(areaMetrics.totalArea / unitSize) : 0;
+        const maxAddableUnits =
+          unitSize > 0 ? Math.floor(areaMetrics.remainingArea / unitSize) : 0;
+
         const { pricingRules, ...rest } = unitType;
 
         return {
           ...rest,
+          depositAmount: computedDepositAmount,
+          depositPercent,
           price: activePrice,
           totalUnits: (unitType as any)._count?.storageUnits ?? 0,
           availableUnits,
+          facilityTotalArea: areaMetrics.totalArea,
+          facilityUsedArea: areaMetrics.usedArea,
+          facilityRemainingArea: areaMetrics.remainingArea,
+          maxTotalUnitsAtSize,
+          maxAddableUnits,
         };
       }),
     );
@@ -110,24 +191,42 @@ export class StorageUnitTypesService {
       throw new NotFoundException(`Storage unit type with ID ${id} not found`);
     }
 
-    const availableUnits = await this.prisma.storageUnit.count({
-      where: {
-        unitTypeId: id,
-        status: StorageUnitStatus.AVAILABLE,
-      },
-    });
+    const [availableUnits, areaMetrics, depositPercent] = await Promise.all([
+      this.prisma.storageUnit.count({
+        where: {
+          unitTypeId: id,
+          status: StorageUnitStatus.AVAILABLE,
+        },
+      }),
+      this.getFacilityAreaMetrics(unitType.facilityId),
+      this.getActiveDepositPercent(unitType.facilityId),
+    ]);
 
     const activePrice = unitType.pricingRules?.[0]?.price
       ? Number(unitType.pricingRules[0].price)
       : Number(unitType.depositAmount);
 
+    const computedDepositAmount = Math.round(
+      activePrice * (depositPercent / 100),
+    );
+    const unitSize = Number(unitType.size) || 0;
+
     const { pricingRules, ...rest } = unitType;
 
     return {
       ...rest,
+      depositAmount: computedDepositAmount,
+      depositPercent,
       price: activePrice,
       totalUnits: (unitType as any)._count?.storageUnits ?? 0,
       availableUnits,
+      facilityTotalArea: areaMetrics.totalArea,
+      facilityUsedArea: areaMetrics.usedArea,
+      facilityRemainingArea: areaMetrics.remainingArea,
+      maxTotalUnitsAtSize:
+        unitSize > 0 ? Math.floor(areaMetrics.totalArea / unitSize) : 0,
+      maxAddableUnits:
+        unitSize > 0 ? Math.floor(areaMetrics.remainingArea / unitSize) : 0,
     };
   }
 
@@ -161,7 +260,12 @@ export class StorageUnitTypesService {
       );
     }
 
-    const rentalPrice = dto.price !== undefined ? dto.price : dto.depositAmount;
+    const depositPercent = await this.getActiveDepositPercent(dto.facilityId);
+    const rentalPrice =
+      dto.price !== undefined ? Number(dto.price) : Number(dto.depositAmount ?? 0);
+    const computedDepositAmount = Math.round(
+      rentalPrice * (depositPercent / 100),
+    );
 
     return this.prisma.$transaction(async (tx) => {
       const createdUnitType = await tx.storageUnitType.create({
@@ -172,7 +276,7 @@ export class StorageUnitTypesService {
           description: dto.description?.trim() || null,
           size: dto.size,
           sizeUnit: dto.sizeUnit?.trim() || 'm2',
-          depositAmount: dto.depositAmount,
+          depositAmount: computedDepositAmount,
           status: dto.status || UnitTypeStatus.ACTIVE,
         },
         include: {
@@ -196,6 +300,7 @@ export class StorageUnitTypesService {
 
       return {
         ...createdUnitType,
+        depositPercent,
         price: Number(pricingRule.price),
       };
     });
@@ -204,10 +309,29 @@ export class StorageUnitTypesService {
   async update(id: string, dto: UpdateStorageUnitTypeDto) {
     const unitType = await this.prisma.storageUnitType.findUnique({
       where: { id },
+      include: {
+        _count: { select: { storageUnits: true } },
+      },
     });
 
     if (!unitType) {
       throw new NotFoundException(`Storage unit type with ID ${id} not found`);
+    }
+
+    // Kiểm tra diện tích cơ sở nếu thay đổi kích thước loại kho đã có ô kho vật lý
+    if (dto.size !== undefined && Number(dto.size) !== Number(unitType.size)) {
+      const unitsOfType = (unitType as any)._count?.storageUnits ?? 0;
+      if (unitsOfType > 0) {
+        const areaMetrics = await this.getFacilityAreaMetrics(unitType.facilityId);
+        const currentTypeArea = Number(unitType.size) * unitsOfType;
+        const otherUsedArea = Math.max(0, areaMetrics.usedArea - currentTypeArea);
+        const nextTotalUsed = otherUsedArea + Number(dto.size) * unitsOfType;
+        if (nextTotalUsed > areaMetrics.totalArea + 0.001) {
+          throw new BadRequestException(
+            `Không thể tăng kích thước lên ${dto.size} m² vì ${unitsOfType} ô kho hiện có sẽ làm tổng diện tích vượt quá giới hạn cơ sở (${areaMetrics.totalArea} m²)!`,
+          );
+        }
+      }
     }
 
     let code = unitType.code;
@@ -229,41 +353,19 @@ export class StorageUnitTypesService {
       }
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      const updatedUnitType = await tx.storageUnitType.update({
-        where: { id },
-        data: {
-          name: dto.name ? dto.name.trim() : undefined,
-          code: dto.code ? code : undefined,
-          description:
-            dto.description !== undefined
-              ? dto.description?.trim() || null
-              : undefined,
-          size: dto.size !== undefined ? dto.size : undefined,
-          sizeUnit: dto.sizeUnit ? dto.sizeUnit.trim() : undefined,
-          depositAmount:
-            dto.depositAmount !== undefined ? dto.depositAmount : undefined,
-          status: dto.status || undefined,
-        },
-        include: {
-          facility: {
-            select: {
-              id: true,
-              name: true,
-              code: true,
-            },
-          },
-        },
-      });
+    const depositPercent = await this.getActiveDepositPercent(unitType.facilityId);
 
-      let activePrice = Number(updatedUnitType.depositAmount);
+    return this.prisma.$transaction(async (tx) => {
+      let activePrice = Number(unitType.depositAmount);
+      const existingRule = await tx.pricingRule.findFirst({
+        where: { unitTypeId: id },
+        orderBy: { effectiveFrom: 'desc' },
+      });
+      if (existingRule) {
+        activePrice = Number(existingRule.price);
+      }
 
       if (dto.price !== undefined) {
-        const existingRule = await tx.pricingRule.findFirst({
-          where: { unitTypeId: id },
-          orderBy: { effectiveFrom: 'desc' },
-        });
-
         if (existingRule) {
           const updatedRule = await tx.pricingRule.update({
             where: { id: existingRule.id },
@@ -283,18 +385,41 @@ export class StorageUnitTypesService {
           });
           activePrice = Number(newRule.price);
         }
-      } else {
-        const existingRule = await tx.pricingRule.findFirst({
-          where: { unitTypeId: id },
-          orderBy: { effectiveFrom: 'desc' },
-        });
-        if (existingRule) {
-          activePrice = Number(existingRule.price);
-        }
       }
+
+      // Tiền cọc luôn tự động tính theo % tiền thuê từ Operation Manager
+      const computedDepositAmount = Math.round(
+        activePrice * (depositPercent / 100),
+      );
+
+      const updatedUnitType = await tx.storageUnitType.update({
+        where: { id },
+        data: {
+          name: dto.name ? dto.name.trim() : undefined,
+          code: dto.code ? code : undefined,
+          description:
+            dto.description !== undefined
+              ? dto.description?.trim() || null
+              : undefined,
+          size: dto.size !== undefined ? dto.size : undefined,
+          sizeUnit: dto.sizeUnit ? dto.sizeUnit.trim() : undefined,
+          depositAmount: computedDepositAmount,
+          status: dto.status || undefined,
+        },
+        include: {
+          facility: {
+            select: {
+              id: true,
+              name: true,
+              code: true,
+            },
+          },
+        },
+      });
 
       return {
         ...updatedUnitType,
+        depositPercent,
         price: activePrice,
       };
     });

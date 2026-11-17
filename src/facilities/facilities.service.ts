@@ -20,6 +20,19 @@ export class FacilitiesService {
     private readonly cloudinaryService: CloudinaryService,
   ) {}
 
+  private async calculateUsedArea(facilityId: string): Promise<number> {
+    const units = await this.prisma.storageUnit.findMany({
+      where: { facilityId },
+      include: {
+        unitType: {
+          select: { size: true },
+        },
+      },
+    });
+    const used = units.reduce((sum, u) => sum + (Number(u.unitType?.size) || 0), 0);
+    return Number(used.toFixed(2));
+  }
+
   async findAll() {
     const facilities = await this.prisma.facility.findMany({
       include: {
@@ -38,18 +51,26 @@ export class FacilitiesService {
 
     const facilitiesWithAvailability = await Promise.all(
       facilities.map(async (facility) => {
-        const availableUnits = await this.prisma.storageUnit.count({
-          where: {
-            facilityId: facility.id,
-            status: StorageUnitStatus.AVAILABLE,
-          },
-        });
+        const [availableUnits, usedArea] = await Promise.all([
+          this.prisma.storageUnit.count({
+            where: {
+              facilityId: facility.id,
+              status: StorageUnitStatus.AVAILABLE,
+            },
+          }),
+          this.calculateUsedArea(facility.id),
+        ]);
 
         const totalUnits = (facility as any)._count?.storageUnits ?? ((facility as any).storageUnits?.length ?? 0);
         const totalUnitTypes = (facility as any)._count?.storageUnitTypes ?? (facility.storageUnitTypes?.length ?? 0);
+        const totalArea = Number((facility as any).totalArea ?? Math.max(300, Math.ceil(usedArea * 1.5)));
+        const remainingArea = Math.max(0, Number((totalArea - usedArea).toFixed(2)));
 
         return {
           ...facility,
+          totalArea,
+          usedArea,
+          remainingArea,
           totalUnits,
           availableUnits,
           totalUnitTypes,
@@ -118,18 +139,26 @@ export class FacilitiesService {
       throw new NotFoundException(`Facility with ID or code '${id}' not found`);
     }
 
-    const availableUnits = await this.prisma.storageUnit.count({
-      where: {
-        facilityId: facility.id,
-        status: StorageUnitStatus.AVAILABLE,
-      },
-    });
+    const [availableUnits, usedArea] = await Promise.all([
+      this.prisma.storageUnit.count({
+        where: {
+          facilityId: facility.id,
+          status: StorageUnitStatus.AVAILABLE,
+        },
+      }),
+      this.calculateUsedArea(facility.id),
+    ]);
 
     const totalUnits = (facility as any)._count?.storageUnits ?? ((facility as any).storageUnits?.length ?? 0);
     const totalUnitTypes = (facility as any)._count?.storageUnitTypes ?? (facility.storageUnitTypes?.length ?? 0);
+    const totalArea = Number((facility as any).totalArea ?? Math.max(300, Math.ceil(usedArea * 1.5)));
+    const remainingArea = Math.max(0, Number((totalArea - usedArea).toFixed(2)));
 
     return {
       ...facility,
+      totalArea,
+      usedArea,
+      remainingArea,
       totalUnits,
       availableUnits,
       totalUnitTypes,
@@ -155,6 +184,7 @@ export class FacilitiesService {
         phone: dto.phone?.trim() || null,
         email: dto.email?.trim().toLowerCase() || null,
         address: dto.address.trim(),
+        totalArea: dto.totalArea !== undefined ? Number(dto.totalArea) : 300,
         images: dto.images || [],
         status: dto.status || FacilityStatus.ACTIVE,
       },
@@ -168,6 +198,15 @@ export class FacilitiesService {
 
     if (!facility) {
       throw new NotFoundException(`Facility with ID ${id} not found`);
+    }
+
+    if (dto.totalArea !== undefined) {
+      const usedArea = await this.calculateUsedArea(id);
+      if (Number(dto.totalArea) + 0.001 < usedArea) {
+        throw new BadRequestException(
+          `Diện tích cơ sở mới (${dto.totalArea} m²) không thể nhỏ hơn tổng diện tích các ô kho hiện có (${usedArea} m²)!`,
+        );
+      }
     }
 
     let code = facility.code;
@@ -198,6 +237,7 @@ export class FacilitiesService {
             ? dto.email?.trim().toLowerCase() || null
             : undefined,
         address: dto.address ? dto.address.trim() : undefined,
+        totalArea: dto.totalArea !== undefined ? Number(dto.totalArea) : undefined,
         images: dto.images !== undefined ? dto.images : undefined,
         status: dto.status || undefined,
       },

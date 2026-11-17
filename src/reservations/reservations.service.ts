@@ -34,6 +34,22 @@ export class ReservationsService {
     private readonly notificationsService: NotificationsService,
   ) {}
 
+  private async getActiveDepositPercent(facilityId?: string): Promise<number> {
+    const policies = await this.prisma.policy.findMany({
+      where: {
+        policyType: 'DEPOSIT',
+        status: 'ACTIVE',
+      },
+      orderBy: { effectiveFrom: 'desc' },
+    });
+    const specific = facilityId ? policies.find((p) => p.facilityId === facilityId) : null;
+    const global = policies.find((p) => !p.facilityId);
+    const chosen = specific || global || policies[0];
+    const val: any = chosen?.value || {};
+    const rawPercent = Number(val.depositPercent ?? val.reservation_deposit_percent ?? 25);
+    return Number.isFinite(rawPercent) && rawPercent > 0 ? rawPercent : 25;
+  }
+
   /**
    * Check storage unit availability for a given facility and unit type
    */
@@ -104,7 +120,9 @@ export class ReservationsService {
     }
 
     const unitPrice = activePricingRule ? Number(activePricingRule.price) : 0;
-    const depositAmount = Number(unitType.depositAmount);
+    const depositPercent = await this.getActiveDepositPercent(dto.facilityId);
+    const depositAmount =
+      unitPrice > 0 ? Math.round(unitPrice * (depositPercent / 100)) : Number(unitType.depositAmount);
 
     let estimatedTotal: number | null = null;
     if (dto.rentalPeriod && dto.rentalPeriod > 0) {
@@ -215,7 +233,9 @@ export class ReservationsService {
     }
 
     const price = pricingRule ? Number(pricingRule.price) : 0;
-    const depositAmount = Number(unitType.depositAmount);
+    const depositPercent = await this.getActiveDepositPercent(dto.facilityId);
+    const depositAmount =
+      price > 0 ? Math.round(price * (depositPercent / 100)) : Number(unitType.depositAmount);
 
     // Calculate rental duration discount
     let discountPercent = 0;

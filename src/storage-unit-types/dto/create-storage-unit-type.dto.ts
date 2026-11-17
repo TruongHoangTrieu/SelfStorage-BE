@@ -37,10 +37,11 @@ export class CreateStorageUnitTypeDto {
   @IsString()
   sizeUnit?: string;
 
+  @IsOptional()
   @Type(() => Number)
   @IsNumber({}, { message: 'depositAmount must be a valid number' })
   @Min(0, { message: 'depositAmount must be greater than or equal to 0' })
-  depositAmount: number;
+  depositAmount?: number;
 
   @IsOptional()
   @Type(() => Number)

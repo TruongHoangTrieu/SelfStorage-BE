@@ -3,10 +3,13 @@ import {
   IsEmail,
   IsEnum,
   IsNotEmpty,
+  IsNumber,
   IsOptional,
+  IsPositive,
   IsString,
   MinLength,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { FacilityStatus } from '@prisma/client';
 
 export class CreateFacilityDto {
@@ -34,6 +37,12 @@ export class CreateFacilityDto {
   @IsString()
   @IsNotEmpty({ message: 'Facility address is required' })
   address: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({}, { message: 'totalArea must be a valid number' })
+  @IsPositive({ message: 'totalArea must be greater than 0' })
+  totalArea?: number;
 
   @IsOptional()
   @IsArray()

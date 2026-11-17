@@ -121,6 +121,26 @@ export class StorageUnitsService {
       );
     }
 
+    // 4.5. Verify facility area capacity allows adding this storage unit
+    const facilityTotalArea = Number((facility as any).totalArea ?? 0);
+    if (facilityTotalArea > 0) {
+      const existingUnitsInFacility = await this.prisma.storageUnit.findMany({
+        where: { facilityId: dto.facilityId },
+        include: { unitType: { select: { size: true } } },
+      });
+      const currentUsedArea = existingUnitsInFacility.reduce(
+        (sum, u) => sum + (Number(u.unitType?.size) || 0),
+        0,
+      );
+      const unitSize = Number(unitType.size) || 0;
+      if (currentUsedArea + unitSize > facilityTotalArea + 0.001) {
+        const remainingArea = Math.max(0, Number((facilityTotalArea - currentUsedArea).toFixed(2)));
+        throw new BadRequestException(
+          `Diện tích cơ sở không đủ! Cơ sở "${facility.name}" có diện tích ${facilityTotalArea} m² (đã dùng ${Number(currentUsedArea.toFixed(2))} m², còn trống ${remainingArea} m²), không thể thêm ô kho kích thước ${unitSize} m².`,
+        );
+      }
+    }
+
     // 5. Create StorageUnit
     return this.prisma.storageUnit.create({
       data: {
