@@ -54,7 +54,7 @@ export class SupportService implements OnModuleInit, OnModuleDestroy {
       try {
         const items = await this.prisma.supportRequest.findMany({
           take: 40,
-          orderBy: { createdAt: 'desc' },
+          orderBy: { updatedAt: 'desc' },
           include: {
             customer: {
               select: { id: true, fullName: true, email: true, phone: true },
@@ -330,6 +330,19 @@ export class SupportService implements OnModuleInit, OnModuleDestroy {
           },
           assignedStaff: {
             select: { id: true, fullName: true, email: true },
+          },
+          logs: {
+            orderBy: { createdAt: 'asc' },
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  fullName: true,
+                  email: true,
+                  role: { select: { name: true } },
+                },
+              },
+            },
           },
           _count: {
             select: { logs: true },
@@ -629,6 +642,14 @@ export class SupportService implements OnModuleInit, OnModuleDestroy {
         },
       },
     });
+
+    // Touch updatedAt để watcher & danh sách sắp xếp theo updatedAt đồng bộ ngay tức thì
+    await this.prisma.supportRequest
+      .update({
+        where: { id },
+        data: { updatedAt: new Date() },
+      })
+      .catch(() => null);
 
     // Realtime WebSocket broadcast
     const eventData = { ticketId: id, log };

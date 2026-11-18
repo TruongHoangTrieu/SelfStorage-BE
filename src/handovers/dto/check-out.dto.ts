@@ -104,4 +104,37 @@ export class CheckOutDto {
   @IsOptional()
   @IsString({ message: 'customerSignature must be a string' })
   customerSignature?: string;
+
+  @ApiPropertyOptional({
+    description: 'Số ngày quá hạn thực tế tại thời điểm trả kho',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  actualOverdueDays?: number;
+
+  @ApiPropertyOptional({
+    description: 'Tiền phạt quá hạn thực tế (sau khi trừ ân hạn từ chính sách Operation Manager)',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  actualOverdueFine?: number;
+
+  @ApiPropertyOptional({
+    description: 'Phương thức hoàn cọc (CASH hoặc BANK_TRANSFER, mặc định CASH)',
+    example: 'CASH',
+  })
+  @IsOptional()
+  @IsString()
+  paymentMethod?: string;
+
+  @ApiPropertyOptional({
+    description: 'Mã Smart Lock PIN mới được đổi sau khi thu hồi quyền truy cập của khách cũ',
+  })
+  @IsOptional()
+  @IsString()
+  newAccessCode?: string;
 }

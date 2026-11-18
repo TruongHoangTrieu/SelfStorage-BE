@@ -586,8 +586,39 @@ export class RenewalsService {
     }
 
     // -------------------------------------------------------------
-    // Bước 2: Quét hợp đồng đã QUÁ HẠN (Overdue Handling)
+    // Bước 2: Quét hợp đồng đã QUÁ HẠN (Áp dụng chính sách Ân hạn / Phạt / Overlock từ Ops Manager)
     // -------------------------------------------------------------
+    const overduePolicies = await this.prisma.policy.findMany({
+      where: {
+        policyType: 'OVERDUE',
+        status: 'ACTIVE',
+      },
+      orderBy: { effectiveFrom: 'desc' },
+    });
+
+    const getOverduePolicyForFacility = (facilityId?: string) => {
+      const specific = facilityId
+        ? overduePolicies.find((p) => p.facilityId === facilityId)
+        : null;
+      const global = overduePolicies.find((p) => !p.facilityId);
+      const chosen = specific || global || overduePolicies[0];
+      const val: any = chosen?.value || {};
+      const gracePeriodDays = Number(
+        val.gracePeriodDays ?? val.grace_period_days ?? 7,
+      );
+      const dailyFinePercent = Number(
+        val.dailyFinePercent ?? val.daily_fine_rate ?? 1.5,
+      );
+      const autoLockoutDays = Number(
+        val.autoLockoutDays ?? val.auto_lockout_days ?? 14,
+      );
+      return {
+        gracePeriodDays: Number.isFinite(gracePeriodDays) ? Math.max(0, gracePeriodDays) : 7,
+        dailyFinePercent: Number.isFinite(dailyFinePercent) ? Math.max(0, dailyFinePercent) : 1.5,
+        autoLockoutDays: Number.isFinite(autoLockoutDays) ? Math.max(1, autoLockoutDays) : 14,
+      };
+    };
+
     const overdueContracts = await this.prisma.rentalContract.findMany({
       where: {
         endDate: { lt: now },
@@ -613,6 +644,9 @@ export class RenewalsService {
     let updatedFeeCount = 0;
 
     for (const contract of overdueContracts) {
+      const facId = contract.contractItems[0]?.unit?.facilityId;
+      const policy = getOverduePolicyForFacility(facId);
+
       // 1. Chuyển trạng thái hợp đồng sang OVERDUE
       if (contract.status !== ContractStatus.OVERDUE) {
         await this.prisma.rentalContract.update({
@@ -622,42 +656,44 @@ export class RenewalsService {
         newlyOverdueCount++;
       }
 
-      // 2. Khóa quyền truy cập mã PIN ổ khóa thông minh (REVOKED)
-      const lockResult = await this.prisma.contractItem.updateMany({
-        where: {
-          contractId: contract.id,
-          accessCodeStatus: AccessCodeStatus.ACTIVE,
-        },
-        data: {
-          accessCodeStatus: AccessCodeStatus.REVOKED,
-        },
-      });
-
-      if (lockResult.count > 0) {
-        lockedAccessCount += lockResult.count;
-        this.logger.warn(
-          `[LOCK ACCESS] Đã thu hồi quyền truy cập của ${lockResult.count} ngăn kho thuộc hợp đồng #${contract.contractCode}`,
-        );
-      }
-
-      // 3. Tính toán số ngày quá hạn và tiền phạt quá hạn
+      // 2. Tính toán số ngày quá hạn thực tế và ngày bị tính phạt (sau ân hạn)
       const diffMs = now.getTime() - new Date(contract.endDate).getTime();
       const overdueDays = Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+      const billableOverdueDays = Math.max(0, overdueDays - policy.gracePeriodDays);
 
-      // Tính tổng tiền thuê tháng của hợp đồng
+      // 3. Chỉ khóa mã PIN Smart Lock (Overlock) khi đạt ngưỡng autoLockoutDays do Ops Manager cấu hình
+      if (overdueDays >= policy.autoLockoutDays) {
+        const lockResult = await this.prisma.contractItem.updateMany({
+          where: {
+            contractId: contract.id,
+            accessCodeStatus: AccessCodeStatus.ACTIVE,
+          },
+          data: {
+            accessCodeStatus: AccessCodeStatus.REVOKED,
+          },
+        });
+
+        if (lockResult.count > 0) {
+          lockedAccessCount += lockResult.count;
+          this.logger.warn(
+            `[LOCK ACCESS] Đã thu hồi quyền truy cập của ${lockResult.count} ngăn kho thuộc hợp đồng #${contract.contractCode} (quá hạn ${overdueDays}/${policy.autoLockoutDays} ngày)`,
+          );
+        }
+      }
+
+      // 4. Tính tiền phạt quá hạn theo chính sách (% trên tiền thuê tháng * số ngày quá hạn sau ân hạn)
       const totalMonthlyRent = contract.contractItems.reduce(
         (sum, item) => sum + (Number(item.rentalPrice) || 0),
         0,
       );
 
-      // Đơn giá thuê 1 ngày (chuẩn 30 ngày/tháng)
-      const dailyRent = totalMonthlyRent / 30;
+      // Nếu đang trong thời gian ân hạn (overdueDays <= gracePeriodDays), billableOverdueDays = 0 -> overdueFee = 0
+      const overdueFee =
+        billableOverdueDays > 0
+          ? Math.round(totalMonthlyRent * (policy.dailyFinePercent / 100) * billableOverdueDays)
+          : 0;
 
-      // Phí phạt quá hạn: Hệ số phạt 1.5x đơn giá theo ngày * số ngày quá hạn
-      // (Ví dụ thuê 1tr5/tháng -> 50k/ngày -> phạt 75k/ngày trễ hạn)
-      const overdueFee = Math.round(dailyRent * 1.5 * overdueDays);
-
-      // 4. Tạo hoặc cập nhật bản ghi OverdueRecord
+      // 5. Tạo hoặc cập nhật bản ghi OverdueRecord
       const openRecord = contract.overdueRecords[0];
 
       if (!openRecord) {

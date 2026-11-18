@@ -22,6 +22,7 @@ import {
   PaymentType,
   PaymentMethod,
   ExtraChargeStatus,
+  OverdueStatus,
   Prisma,
 } from '@prisma/client';
 import { UserRole } from '../common/enums/role.enum';
@@ -634,6 +635,78 @@ export class HandoversService {
     });
   }
 
+  private async getActiveOverduePolicy(facilityId?: string) {
+    const policies = await this.prisma.policy.findMany({
+      where: {
+        policyType: 'OVERDUE',
+        status: 'ACTIVE',
+      },
+      orderBy: { effectiveFrom: 'desc' },
+    });
+    const specific = facilityId ? policies.find((p) => p.facilityId === facilityId) : null;
+    const global = policies.find((p) => !p.facilityId);
+    const chosen = specific || global || policies[0];
+    const val: any = chosen?.value || {};
+    const gracePeriodDays = Number(val.gracePeriodDays ?? val.grace_period_days ?? 7);
+    const dailyFinePercent = Number(val.dailyFinePercent ?? val.daily_fine_rate ?? 1.5);
+    const autoLockoutDays = Number(val.autoLockoutDays ?? val.auto_lockout_days ?? 14);
+    return {
+      gracePeriodDays: Number.isFinite(gracePeriodDays) ? Math.max(0, gracePeriodDays) : 7,
+      dailyFinePercent: Number.isFinite(dailyFinePercent) ? Math.max(0, dailyFinePercent) : 1.5,
+      autoLockoutDays: Number.isFinite(autoLockoutDays) ? Math.max(1, autoLockoutDays) : 14,
+    };
+  }
+
+  private async computeOverdueBreakdown(contract: any, facilityId?: string) {
+    const policy = await this.getActiveOverduePolicy(facilityId);
+    const now = new Date();
+    const endDate = contract.endDate ? new Date(contract.endDate) : now;
+    const isPastEnd = endDate.getTime() < now.getTime();
+    const rawOverdueDays = isPastEnd
+      ? Math.max(1, Math.ceil((now.getTime() - endDate.getTime()) / (1000 * 60 * 60 * 24)))
+      : 0;
+    const billableOverdueDays = Math.max(0, rawOverdueDays - policy.gracePeriodDays);
+    const isInGracePeriod = rawOverdueDays > 0 && rawOverdueDays <= policy.gracePeriodDays;
+    const isAutoLocked = rawOverdueDays >= policy.autoLockoutDays;
+    const monthlyRent = (contract.contractItems || []).reduce(
+      (sum: number, item: any) => sum + (Number(item.rentalPrice) || 0),
+      0,
+    );
+    const dailyFineAmount = Math.round(monthlyRent * (policy.dailyFinePercent / 100));
+
+    const records: any[] = contract.overdueRecords || [];
+    const settledRecord = records.find(
+      (r) => r.status === OverdueStatus.RESOLVED || r.status === OverdueStatus.WAIVED,
+    );
+    const openRecord = records.find((r) => r.status === OverdueStatus.OPEN);
+
+    const calculatedOverdueFine = settledRecord
+      ? 0
+      : billableOverdueDays > 0
+      ? Math.round(monthlyRent * (policy.dailyFinePercent / 100) * billableOverdueDays)
+      : 0;
+
+    return {
+      rawOverdueDays,
+      gracePeriodDays: policy.gracePeriodDays,
+      dailyFinePercent: policy.dailyFinePercent,
+      autoLockoutDays: policy.autoLockoutDays,
+      isInGracePeriod,
+      isAutoLocked,
+      billableOverdueDays,
+      monthlyRent,
+      dailyFineAmount,
+      calculatedOverdueFine,
+      overdueStatus: settledRecord
+        ? settledRecord.status
+        : openRecord
+        ? OverdueStatus.OPEN
+        : rawOverdueDays > 0
+        ? 'OVERDUE'
+        : 'NONE',
+    };
+  }
+
   /**
    * Tra cứu thông tin hợp đồng để chuẩn bị Check-out / Trả kho và đối soát hiện trạng
    */
@@ -700,6 +773,7 @@ export class HandoversService {
             },
           },
         },
+        overdueRecords: true,
       },
     });
 
@@ -715,7 +789,7 @@ export class HandoversService {
       contract.reservation.facility.name,
     );
 
-    // Tính toán tài chính
+    // Tính toán tài chính & chính sách ân hạn / quá hạn từ Operations Manager
     const totalDepositAmount = contract.contractItems.reduce(
       (sum, item) => sum + (item.depositAmount || 0),
       0,
@@ -726,6 +800,10 @@ export class HandoversService {
     const unpaidExtraChargesAmount = pendingExtraCharges.reduce(
       (sum, ec) => sum + (ec.amount || 0),
       0,
+    );
+    const overdueInfo = await this.computeOverdueBreakdown(
+      contract,
+      contract.reservation.facilityId,
     );
 
     // Mask số CCCD nếu có
@@ -747,6 +825,9 @@ export class HandoversService {
         startDate: contract.startDate,
         endDate: contract.endDate,
         signedAt: contract.signedAt,
+        returnDate: contract.returnDate,
+        returnTimeSlot: contract.returnTimeSlot,
+        returnRequestedAt: contract.returnRequestedAt,
       },
       facility: contract.reservation.facility,
       customer: {
@@ -761,7 +842,12 @@ export class HandoversService {
       financialSummary: {
         totalDepositAmount,
         unpaidExtraChargesAmount,
-        estimatedRefundAmount: Math.max(0, totalDepositAmount - unpaidExtraChargesAmount),
+        overdueFineAmount: overdueInfo.calculatedOverdueFine,
+        estimatedRefundAmount: Math.max(
+          0,
+          totalDepositAmount - unpaidExtraChargesAmount - overdueInfo.calculatedOverdueFine,
+        ),
+        overdueInfo,
         pendingExtraCharges: pendingExtraCharges.map((ec) => ({
           id: ec.id,
           feeType: ec.feeType?.name,
@@ -825,6 +911,7 @@ export class HandoversService {
           },
         },
         extraCharges: true,
+        overdueRecords: true,
       },
     });
 
@@ -866,12 +953,27 @@ export class HandoversService {
       .filter((ec) => ec.status === ExtraChargeStatus.PENDING)
       .reduce((sum, ec) => sum + (ec.amount || 0), 0);
 
+    const overdueBreakdown = await this.computeOverdueBreakdown(
+      contract,
+      contract.reservation.facilityId,
+    );
     const damageFee = dto.damageFee || 0;
     const cleaningFee = dto.cleaningFee || 0;
+    const overdueFine =
+      dto.actualOverdueFine !== undefined
+        ? dto.actualOverdueFine
+        : overdueBreakdown.calculatedOverdueFine;
     const netRefundAmount =
       dto.refundAmount !== undefined
         ? dto.refundAmount
-        : Math.max(0, totalDeposit - damageFee - cleaningFee - unpaidExtraCharges);
+        : Math.max(
+            0,
+            totalDeposit - damageFee - cleaningFee - unpaidExtraCharges - overdueFine,
+          );
+    const refundMethod =
+      dto.paymentMethod === 'BANK_TRANSFER'
+        ? PaymentMethod.BANK_TRANSFER
+        : PaymentMethod.CASH;
 
     return this.prisma.$transaction(async (tx) => {
       const handoverRecords = [];
@@ -896,12 +998,15 @@ export class HandoversService {
         });
         handoverRecords.push(hr);
 
-        // 2. Cập nhật ContractItem -> RETURNED & thu hồi mã PIN
+        // 2. Cập nhật ContractItem -> RETURNED, thu hồi quyền mở khóa & lưu mã PIN mới nếu có
         await tx.contractItem.update({
           where: { id: item.id },
           data: {
             status: ContractItemStatus.RETURNED,
             accessCodeStatus: AccessCodeStatus.REVOKED,
+            ...(dto.newAccessCode?.trim()
+              ? { accessCode: dto.newAccessCode.trim() }
+              : {}),
           },
         });
 
@@ -914,7 +1019,7 @@ export class HandoversService {
         });
       }
 
-      // 4. Tạo ExtraCharge nếu có phí hư hại hoặc vệ sinh
+      // 4. Tạo ExtraCharge nếu có phí hư hại, vệ sinh hoặc phạt quá hạn (sau ân hạn)
       const createdCharges = [];
       if (damageFee > 0) {
         const feeType = await tx.feeType.findFirst({
@@ -954,7 +1059,39 @@ export class HandoversService {
         }
       }
 
-      // 5. Tạo Payment record hoàn trả cọc
+      if (overdueFine > 0) {
+        const feeType = await tx.feeType.findFirst({
+          where: { status: 'ACTIVE' },
+        });
+        if (feeType) {
+          const ec = await tx.extraCharge.create({
+            data: {
+              contractId: contract.id,
+              feeTypeId: feeType.id,
+              amount: overdueFine,
+              reason: `Khấu trừ tiền cọc: Phạt trễ hạn trả kho (${overdueBreakdown.billableOverdueDays} ngày sau ân hạn ${overdueBreakdown.gracePeriodDays} ngày)`,
+              status: ExtraChargeStatus.PAID,
+              createdBy: user.id,
+            },
+          });
+          createdCharges.push(ec);
+        }
+      }
+
+      // 4.5. Đóng các bản ghi OverdueRecord đang OPEN sang RESOLVED khi hoàn tất trả kho
+      await tx.overdueRecord.updateMany({
+        where: {
+          contractId: contract.id,
+          status: OverdueStatus.OPEN,
+        },
+        data: {
+          status: OverdueStatus.RESOLVED,
+          resolvedBy: user.id,
+          resolvedAt: new Date(),
+        },
+      });
+
+      // 5. Tạo Payment record hoàn trả cọc (Chủ yếu bằng tiền mặt tại quầy)
       let refundPayment = null;
       if (dto.refundDeposit !== false && netRefundAmount > 0) {
         const paymentCode = `PAY-REF-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
@@ -964,7 +1101,7 @@ export class HandoversService {
             contractId: contract.id,
             paymentType: PaymentType.REFUND,
             amount: netRefundAmount,
-            paymentMethod: PaymentMethod.BANK_TRANSFER,
+            paymentMethod: refundMethod,
             status: PaymentStatus.PAID,
             paidAt: new Date(),
           },
@@ -1009,13 +1146,17 @@ export class HandoversService {
           totalDeposit,
           damageFee,
           cleaningFee,
+          overdueFine,
+          overdueInfo: overdueBreakdown,
           unpaidExtraCharges,
           refundDepositAmount: netRefundAmount,
+          refundMethod,
           refundPayment: refundPayment
             ? {
                 id: refundPayment.id,
                 paymentCode: refundPayment.paymentCode,
                 amount: refundPayment.amount,
+                paymentMethod: refundPayment.paymentMethod,
                 status: refundPayment.status,
               }
             : null,
