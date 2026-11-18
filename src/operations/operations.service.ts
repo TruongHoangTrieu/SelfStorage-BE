@@ -16,6 +16,7 @@ import {
   AccessCodeStatus,
   StorageUnitStatus,
 } from '@prisma/client';
+import { maskCccd } from '../common/utils/crypto.util';
 
 @Injectable()
 export class OperationsService {
@@ -598,6 +599,7 @@ export class OperationsService {
         },
         contractItems: {
           include: {
+            handoverRecords: true,
             unit: {
               select: {
                 id: true,
@@ -624,21 +626,30 @@ export class OperationsService {
         endDateMs < now && c.status !== ContractStatus.TERMINATED && c.status !== 'COMPLETED'
           ? Math.ceil((now - endDateMs) / (1000 * 60 * 60 * 24))
           : 0;
+      const maskedCccd = c.customerIdentityNumber ? maskCccd(c.customerIdentityNumber) : '';
+      const checkInHandover = firstItem?.handoverRecords?.find((h: any) => h.type === 'CHECK_IN') || firstItem?.handoverRecords?.[0];
 
       return {
         ...c,
+        customerIdentityNumber: maskedCccd,
+        maskedIdentityNumber: maskedCccd,
         contractNumber: c.contractCode,
         customerName: c.customer?.fullName || 'Khách hàng',
         customerPhone: c.customer?.phone || '',
+        customerEmail: c.customer?.email || '',
         facilityId: facility?.id || c.reservation?.facilityId || unit?.facilityId,
         facilityName: facility?.name || 'Chi nhánh kho',
         facility,
         storageUnit: unit,
         unitNumber: unit?.unitNumber || 'N/A',
         unitTypeName: unit?.unitType?.name || 'Tiêu chuẩn',
+        unitSize: unit?.unitType?.size ? `${unit.unitType.size} ${unit.unitType.sizeUnit || 'm²'}` : '3m²',
         monthlyRent: firstItem?.rentalPrice || 0,
         rentalFee: firstItem?.rentalPrice || 0,
         depositAmount: firstItem?.depositAmount || 0,
+        accessPin: firstItem?.accessCode || '',
+        handoverCondition: checkInHandover?.condition || 'Kho sạch sẽ, khóa thông minh hoạt động tốt',
+        handoverPhotos: Array.isArray(checkInHandover?.photos) ? checkInHandover.photos : [],
         overdueDays,
       };
     });
