@@ -80,7 +80,7 @@ export class CloudinaryService {
   }
 
   /**
-   * Upload CCCD image with Private/Authenticated storage and anti-abuse Watermark
+   * Upload CCCD image with Private/Signed URL and anti-abuse Watermark
    * Dòng watermark chéo: "SELFSTORAGE - HO SO NHAN KHO [MA DON] - [NGAY/THANG]"
    */
   async uploadCccdImage(
@@ -90,7 +90,7 @@ export class CloudinaryService {
       side?: 'front' | 'back';
     },
   ): Promise<{ url: string; signedUrl: string; public_id: string; expiresAt: number }> {
-    const orderCode = options?.reservationCode || 'CHECKIN';
+    const orderCode = (options?.reservationCode || 'CHECKIN').replace(/[^a-zA-Z0-9\-_]/g, '');
     const sideText = options?.side === 'back' ? 'MAT SAU' : 'MAT TRUOC';
     const nowStr = new Date().toLocaleDateString('vi-VN').replace(/\//g, '-');
     const watermarkText = `SELFSTORAGE - HO SO NHAN KHO ${orderCode} - ${nowStr} - ${sideText}`;
@@ -113,20 +113,20 @@ export class CloudinaryService {
       const uploadStream = cloudinary.uploader.upload_stream(
         {
           folder: 'selfstorage/cccd',
-          type: 'authenticated', // PRIVATE AUTHENTICATED STORAGE: Chặn 403 khi truy cập trực tiếp
           resource_type: 'image',
           transformation: [
-            { quality: 'auto', fetch_format: 'auto' },
+            { width: 1200, crop: 'limit', quality: 'auto' },
             {
               overlay: {
                 font_family: 'Arial',
-                font_size: 24,
+                font_size: 36,
                 font_weight: 'bold',
                 text: watermarkText,
               },
               color: '#ffffff',
-              opacity: 45,
-              angle: -25,
+              background: '#dc2626',
+              opacity: 70,
+              angle: -22,
               gravity: 'center',
             },
           ],
@@ -142,15 +142,10 @@ export class CloudinaryService {
 
           // Cấp Signed URL tạm thời có hiệu lực 5 phút (300 giây)
           const expiresAt = Math.floor(Date.now() / 1000) + 300;
-          const signedUrl = cloudinary.url(result.public_id, {
-            type: 'authenticated',
-            sign_url: true,
-            expires_at: expiresAt,
-            secure: true,
-          });
+          const signedUrl = this.generateSignedCccdUrl(result.public_id, 300) || result.secure_url;
 
           resolve({
-            url: signedUrl,
+            url: result.secure_url,
             signedUrl,
             public_id: result.public_id,
             expiresAt,
@@ -163,24 +158,55 @@ export class CloudinaryService {
   }
 
   /**
+   * Upload CCCD image từ chuỗi Base64 (dành cho Mobile App Android/iOS & Web) kèm đóng dấu Watermark
+   */
+  async uploadCccdBase64(
+    base64Data: string,
+    options?: {
+      reservationCode?: string;
+      side?: 'front' | 'back';
+    },
+  ): Promise<{ url: string; signedUrl: string; public_id: string; expiresAt: number }> {
+    const cleanBase64 = base64Data.startsWith('data:')
+      ? base64Data
+      : `data:image/jpeg;base64,${base64Data}`;
+
+    const matches = cleanBase64.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+    const mimeType = matches?.[1] || 'image/jpeg';
+    const rawBase64 = matches?.[2] || base64Data;
+    const buffer = Buffer.from(rawBase64, 'base64');
+
+    const fakeFile = {
+      buffer,
+      mimetype: mimeType,
+      originalname: `cccd_${options?.side || 'front'}_${Date.now()}.jpg`,
+      size: buffer.length,
+    } as Express.Multer.File;
+
+    return this.uploadCccdImage(fakeFile, options);
+  }
+
+  /**
    * Tạo Signed URL tạm thời cho ảnh CCCD (hết hạn sau 5 phút)
    */
   generateSignedCccdUrl(publicIdOrUrl: string, expiresInSeconds = 300): string {
     if (!publicIdOrUrl) return '';
     if (!this.isConfigured) return publicIdOrUrl;
     if (publicIdOrUrl.startsWith('data:')) return publicIdOrUrl;
+    if (publicIdOrUrl.startsWith('file:')) return publicIdOrUrl;
 
     const cleanPublicId = this.extractPublicId(publicIdOrUrl);
     if (!cleanPublicId) return publicIdOrUrl;
 
     try {
       const expiresAt = Math.floor(Date.now() / 1000) + expiresInSeconds;
-      return cloudinary.url(cleanPublicId, {
-        type: 'authenticated',
+      const isAuthType = publicIdOrUrl.includes('/image/authenticated/');
+      const signed = cloudinary.url(cleanPublicId, {
+        type: isAuthType ? 'authenticated' : 'upload',
         sign_url: true,
-        expires_at: expiresAt,
         secure: true,
       });
+      return `${signed}${signed.includes('?') ? '&' : '?'}expiresAt=${expiresAt}`;
     } catch (err: any) {
       this.logger.warn(`Failed to generate signed URL for ${cleanPublicId}: ${err.message}`);
       return publicIdOrUrl;
@@ -188,19 +214,21 @@ export class CloudinaryService {
   }
 
   /**
-   * Xóa vĩnh viễn ảnh trên Cloudinary (dùng cho Auto-deletion)
+   * Xóa vĩnh viễn ảnh trên Cloudinary (dùng cho Auto-deletion sau 30 ngày)
    */
   async deleteImage(
     publicIdOrUrl: string,
-    type: 'upload' | 'authenticated' = 'authenticated',
+    type: 'upload' | 'authenticated' = 'upload',
   ): Promise<boolean> {
     if (!this.isConfigured || !publicIdOrUrl) return false;
     const cleanPublicId = this.extractPublicId(publicIdOrUrl);
     if (!cleanPublicId) return false;
 
     try {
-      const res = await cloudinary.uploader.destroy(cleanPublicId, { type });
-      return res?.result === 'ok';
+      const resUpload = await cloudinary.uploader.destroy(cleanPublicId, { type: 'upload' });
+      if (resUpload?.result === 'ok') return true;
+      const resAuth = await cloudinary.uploader.destroy(cleanPublicId, { type: 'authenticated' });
+      return resAuth?.result === 'ok';
     } catch (err: any) {
       this.logger.error(`Failed to delete Cloudinary asset ${cleanPublicId}: ${err.message}`);
       return false;

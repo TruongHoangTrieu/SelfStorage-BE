@@ -23,7 +23,7 @@ import {
 } from '@prisma/client';
 import { UserRole } from '../common/enums/role.enum';
 import { NotificationsService } from '../notifications/notifications.service';
-import { decryptCccd } from '../common/utils/crypto.util';
+import { decryptCccd, maskCccd } from '../common/utils/crypto.util';
 
 @Injectable()
 export class ReservationsService {
@@ -551,7 +551,8 @@ export class ReservationsService {
   }
 
   /**
-   * Đính kèm trạng thái phê duyệt mở lại đơn quá hạn từ MongoDB (ActivityLog) vào danh sách đơn đặt chỗ
+   * Đính kèm trạng thái phê duyệt mở lại đơn quá hạn từ MongoDB (ActivityLog)
+   * và che mờ (Mask) số CCCD khách hàng trước khi trả về client
    */
   private async attachManagerApprovalMetadata(reservations: any[]) {
     if (!Array.isArray(reservations) || reservations.length === 0) {
@@ -567,8 +568,6 @@ export class ReservationsService {
       orderBy: { createdAt: 'desc' },
     });
 
-    if (logs.length === 0) return reservations;
-
     const latestByResId = new Map<string, any>();
     for (const log of logs) {
       if (log.entityId && !latestByResId.has(log.entityId)) {
@@ -581,10 +580,30 @@ export class ReservationsService {
     }
 
     return reservations.map((r) => {
+      const cloned = { ...r };
+
+      // Lớp 2: Che mờ số CCCD (Data Masking: 079******345) trên mọi danh sách/chi tiết đơn
+      if (cloned.customer?.identityNumber) {
+        const masked = maskCccd(cloned.customer.identityNumber);
+        cloned.customer = {
+          ...cloned.customer,
+          maskedIdentityNumber: masked,
+          identityNumber: masked,
+        };
+      }
+      if (cloned.rentalContract?.customerIdentityNumber) {
+        const maskedContractCccd = maskCccd(cloned.rentalContract.customerIdentityNumber);
+        cloned.rentalContract = {
+          ...cloned.rentalContract,
+          maskedIdentityNumber: maskedContractCccd,
+          customerIdentityNumber: maskedContractCccd,
+        };
+      }
+
       const meta = latestByResId.get(String(r.id));
-      if (!meta) return r;
+      if (!meta) return cloned;
       return {
-        ...r,
+        ...cloned,
         managerApprovalStatus: meta.status,
         managerApprovalRequestedBy: meta.requestedBy,
         managerApprovalRequestedAt: meta.requestedAt,

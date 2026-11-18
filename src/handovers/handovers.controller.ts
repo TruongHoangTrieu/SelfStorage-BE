@@ -137,7 +137,7 @@ export class HandoversController {
     return this.handoversService.logCccdAccess(dto, user, clientIp);
   }
 
-  @ApiOperation({ summary: 'Tải ảnh CCCD bảo mật (Private Authenticated + Watermark chống lạm dụng)' })
+  @ApiOperation({ summary: 'Tải ảnh CCCD bảo mật (Private Signed URL + Watermark chống lạm dụng)' })
   @ApiResponse({ status: 200, description: 'Tải ảnh CCCD thành công, trả về Signed URL tạm thời 5 phút' })
   @Roles(
     UserRole.FACILITY_STAFF,
@@ -149,14 +149,18 @@ export class HandoversController {
   @HttpCode(HttpStatus.OK)
   @UseInterceptors(FileInterceptor('photo'))
   async uploadCccd(
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file?: Express.Multer.File,
+    @Body('base64') base64?: string,
     @Body('reservationCode') reservationCode?: string,
     @Body('side') side?: 'front' | 'back',
   ) {
-    if (!file) {
-      throw new BadRequestException('Vui lòng chọn tệp ảnh CCCD để tải lên');
+    if (file) {
+      return this.cloudinaryService.uploadCccdImage(file, { reservationCode, side });
     }
-    return this.cloudinaryService.uploadCccdImage(file, { reservationCode, side });
+    if (base64 && typeof base64 === 'string' && base64.trim()) {
+      return this.cloudinaryService.uploadCccdBase64(base64.trim(), { reservationCode, side });
+    }
+    throw new BadRequestException('Vui lòng chọn tệp ảnh CCCD hoặc gửi dữ liệu ảnh Base64 để tải lên');
   }
 
   @ApiOperation({ summary: 'Tải ảnh hiện trạng bàn giao lên Cloudinary' })

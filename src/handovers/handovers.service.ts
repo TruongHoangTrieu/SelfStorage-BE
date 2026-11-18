@@ -279,7 +279,7 @@ export class HandoversService {
       // Cập nhật thông tin CCCD khách hàng nếu có
       if (dto.identityNumber || dto.identityFrontUrl || dto.identityBackUrl) {
         const updateData: any = {};
-        if (dto.identityNumber && dto.identityNumber.trim()) {
+        if (dto.identityNumber && dto.identityNumber.trim() && !dto.identityNumber.includes('*')) {
           const cleanId = dto.identityNumber.trim();
           updateData.identityType = dto.identityType || 'CCCD';
           updateData.identityNumber = encryptCccd(cleanId);
@@ -347,7 +347,10 @@ export class HandoversService {
           where: { id: contract.id },
           data: {
             customerIdentityType: dto.identityType || 'CCCD',
-            customerIdentityNumber: dto.identityNumber ? encryptCccd(dto.identityNumber.trim()) : undefined,
+            customerIdentityNumber:
+              dto.identityNumber && !dto.identityNumber.includes('*')
+                ? encryptCccd(dto.identityNumber.trim())
+                : undefined,
             customerIdentityFrontUrl: dto.identityFrontUrl || undefined,
             customerIdentityBackUrl: dto.identityBackUrl || undefined,
             customerAddress: dto.identityAddress ? dto.identityAddress.trim() : undefined,
@@ -461,7 +464,7 @@ export class HandoversService {
       let customerIdentityBackUrl = dto.identityBackUrl || reservation.customer?.identityBackUrl;
 
       const userIdentityUpdate: any = {};
-      if (dto.identityNumber && dto.identityNumber.trim()) {
+      if (dto.identityNumber && dto.identityNumber.trim() && !dto.identityNumber.includes('*')) {
         const cleanId = dto.identityNumber.trim();
         customerIdentityType = dto.identityType || customerIdentityType || 'CCCD';
         customerIdentityNumber = encryptCccd(cleanId);
@@ -1169,16 +1172,42 @@ export class HandoversService {
    * Record Audit Log when staff unmasks or prints contract with CCCD and return decrypted value
    */
   async logCccdAccess(dto: LogCccdAccessDto, user: any, clientIp?: string) {
-    const reservation = await this.prisma.reservation.findUnique({
-      where: { id: dto.reservationId },
+    const rawTarget = (dto.reservationId || dto.contractId || '').trim();
+    const isObjectId = /^[a-f\d]{24}$/i.test(rawTarget);
+
+    let reservation = await this.prisma.reservation.findFirst({
+      where: isObjectId
+        ? { OR: [{ id: rawTarget }, { reservationCode: rawTarget }] }
+        : { reservationCode: rawTarget },
       include: {
         customer: true,
         facility: true,
+        rentalContract: true,
       },
     });
 
+    if (!reservation && rawTarget) {
+      const contract = await this.prisma.rentalContract.findFirst({
+        where: isObjectId
+          ? { OR: [{ id: rawTarget }, { contractCode: rawTarget }] }
+          : { contractCode: rawTarget },
+        include: {
+          reservation: {
+            include: {
+              customer: true,
+              facility: true,
+              rentalContract: true,
+            },
+          },
+        },
+      });
+      if (contract?.reservation) {
+        reservation = contract.reservation;
+      }
+    }
+
     if (!reservation) {
-      throw new NotFoundException(`Reservation #${dto.reservationId} not found`);
+      throw new NotFoundException(`Reservation or Contract #${rawTarget} not found`);
     }
 
     const userRole = typeof user.role === 'string' ? user.role : user.role?.name;
@@ -1190,11 +1219,12 @@ export class HandoversService {
     );
 
     const isPrint = dto.action === 'PRINT_CONTRACT_WITH_CCCD';
+    const reasonSuffix = dto.reason ? ` | Lý do: ${dto.reason}` : '';
     const actionDesc = isPrint
-      ? `Nhân viên đã xuất in hợp đồng chứa thông tin CCCD cho đơn #${reservation.reservationCode || reservation.id} (Khách: ${dto.customerName || reservation.customer?.fullName || 'N/A'}) | IP: ${clientIp || 'N/A'}`
-      : `Nhân viên đã mở xem toàn bộ số CCCD cho đơn #${reservation.reservationCode || reservation.id} (Khách: ${dto.customerName || reservation.customer?.fullName || 'N/A'}) | IP: ${clientIp || 'N/A'}`;
+      ? `Nhân viên đã xuất in hợp đồng chứa thông tin CCCD cho đơn #${reservation.reservationCode || reservation.id} (Khách: ${dto.customerName || reservation.customer?.fullName || 'N/A'})${reasonSuffix} | IP: ${clientIp || 'N/A'}`
+      : `Nhân viên đã mở xem toàn bộ số CCCD cho đơn #${reservation.reservationCode || reservation.id} (Khách: ${dto.customerName || reservation.customer?.fullName || 'N/A'})${reasonSuffix} | IP: ${clientIp || 'N/A'}`;
 
-    await this.prisma.activityLog.create({
+    const auditLog = await this.prisma.activityLog.create({
       data: {
         userId: user.id,
         action: isPrint ? 'PRINT_CONTRACT_WITH_CCCD' : 'VIEW_UNMASKED_CCCD',
@@ -1204,27 +1234,48 @@ export class HandoversService {
       },
     });
 
-    const decryptedNumber = reservation.customer?.identityNumber
-      ? decryptCccd(reservation.customer.identityNumber)
-      : null;
+    const rawCipher =
+      reservation.customer?.identityNumber ||
+      reservation.rentalContract?.customerIdentityNumber ||
+      null;
+    const decryptedNumber = rawCipher ? decryptCccd(rawCipher) : null;
+    const maskedNumber = rawCipher ? maskCccd(rawCipher) : null;
 
-    // Generate fresh 5-minute signed URLs for private authenticated CCCD images
-    const frontSignedUrl = reservation.customer?.identityFrontUrl
-      ? this.cloudinaryService.generateSignedCccdUrl(reservation.customer.identityFrontUrl, 300)
+    const rawFrontUrl =
+      reservation.customer?.identityFrontUrl ||
+      reservation.rentalContract?.customerIdentityFrontUrl ||
+      null;
+    const rawBackUrl =
+      reservation.customer?.identityBackUrl ||
+      reservation.rentalContract?.customerIdentityBackUrl ||
+      null;
+
+    // Generate fresh 5-minute signed URLs for CCCD images
+    const frontSignedUrl = rawFrontUrl
+      ? this.cloudinaryService.generateSignedCccdUrl(rawFrontUrl, 300)
       : null;
-    const backSignedUrl = reservation.customer?.identityBackUrl
-      ? this.cloudinaryService.generateSignedCccdUrl(reservation.customer.identityBackUrl, 300)
+    const backSignedUrl = rawBackUrl
+      ? this.cloudinaryService.generateSignedCccdUrl(rawBackUrl, 300)
       : null;
 
     return {
       success: true,
-      identityType: reservation.customer?.identityType || 'CCCD',
+      identityType:
+        reservation.customer?.identityType ||
+        reservation.rentalContract?.customerIdentityType ||
+        'CCCD',
       identityNumber: decryptedNumber,
+      decryptedNumber,
+      maskedNumber,
       identityIssueDate: reservation.customer?.identityIssueDate,
       identityIssuePlace: reservation.customer?.identityIssuePlace,
-      identityAddress: reservation.customer?.identityAddress,
+      identityAddress:
+        reservation.customer?.identityAddress ||
+        reservation.rentalContract?.customerAddress,
       identityFrontUrl: frontSignedUrl,
       identityBackUrl: backSignedUrl,
+      auditLogId: auditLog.id,
+      accessedAt: auditLog.createdAt.toISOString(),
     };
   }
 
