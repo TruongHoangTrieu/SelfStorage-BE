@@ -650,13 +650,15 @@ export class HandoversService {
     const global = policies.find((p) => !p.facilityId);
     const chosen = specific || global || policies[0];
     const val: any = chosen?.value || {};
-    const gracePeriodDays = Number(val.gracePeriodDays ?? val.grace_period_days ?? 7);
+    const liquidationThresholdDays = Number(
+      val.liquidationThresholdDays ?? val.gracePeriodDays ?? val.grace_period_days ?? 7,
+    );
     const dailyFinePercent = Number(val.dailyFinePercent ?? val.daily_fine_rate ?? 1.5);
-    const autoLockoutDays = Number(val.autoLockoutDays ?? val.auto_lockout_days ?? 14);
     return {
-      gracePeriodDays: Number.isFinite(gracePeriodDays) ? Math.max(0, gracePeriodDays) : 7,
+      liquidationThresholdDays: Number.isFinite(liquidationThresholdDays)
+        ? Math.max(0, liquidationThresholdDays)
+        : 7,
       dailyFinePercent: Number.isFinite(dailyFinePercent) ? Math.max(0, dailyFinePercent) : 1.5,
-      autoLockoutDays: Number.isFinite(autoLockoutDays) ? Math.max(1, autoLockoutDays) : 14,
     };
   }
 
@@ -668,9 +670,12 @@ export class HandoversService {
     const rawOverdueDays = isPastEnd
       ? Math.max(1, Math.ceil((now.getTime() - endDate.getTime()) / (1000 * 60 * 60 * 24)))
       : 0;
-    const billableOverdueDays = Math.max(0, rawOverdueDays - policy.gracePeriodDays);
-    const isInGracePeriod = rawOverdueDays > 0 && rawOverdueDays <= policy.gracePeriodDays;
-    const isAutoLocked = rawOverdueDays >= policy.autoLockoutDays;
+    // MỖI ngày trễ đều bị tính phạt theo mức phạt hàng ngày; liquidationThresholdDays là số ngày tối đa trước khi thanh lý kho
+    const billableOverdueDays = rawOverdueDays;
+    const isWithinPreLiquidationWindow =
+      rawOverdueDays > 0 && rawOverdueDays <= policy.liquidationThresholdDays;
+    const isInGracePeriod = false;
+    const isLiquidationEligible = rawOverdueDays > policy.liquidationThresholdDays;
     const monthlyRent = (contract.contractItems || []).reduce(
       (sum: number, item: any) => sum + (Number(item.rentalPrice) || 0),
       0,
@@ -691,11 +696,12 @@ export class HandoversService {
 
     return {
       rawOverdueDays,
-      gracePeriodDays: policy.gracePeriodDays,
+      liquidationThresholdDays: policy.liquidationThresholdDays,
+      gracePeriodDays: policy.liquidationThresholdDays,
       dailyFinePercent: policy.dailyFinePercent,
-      autoLockoutDays: policy.autoLockoutDays,
+      isWithinPreLiquidationWindow,
       isInGracePeriod,
-      isAutoLocked,
+      isLiquidationEligible,
       billableOverdueDays,
       monthlyRent,
       dailyFineAmount,

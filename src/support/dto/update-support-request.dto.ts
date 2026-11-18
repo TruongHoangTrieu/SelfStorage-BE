@@ -13,9 +13,9 @@ export class UpdateTicketProgressDto {
   })
   status: SupportStatus;
 
+  @IsOptional()
   @IsString()
-  @IsNotEmpty({ message: 'Ghi chú tiến độ / phương án giải quyết không được để trống' })
-  note: string;
+  note?: string;
 
   @IsOptional()
   @IsArray()

@@ -562,11 +562,14 @@ export class SupportService implements OnModuleInit, OnModuleDestroy {
         },
       });
 
+      const effectiveNote =
+        dto.note?.trim() || `Cập nhật trạng thái sang ${dto.status}`;
+
       await tx.supportRequestLog.create({
         data: {
           supportRequestId: id,
           userId: user.id,
-          note: dto.note.trim(),
+          note: effectiveNote,
           oldStatus: request.status,
           newStatus: dto.status,
         },

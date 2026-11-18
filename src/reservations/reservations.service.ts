@@ -427,7 +427,6 @@ export class ReservationsService {
           notIn: [
             ReservationStatus.PENDING,
             ReservationStatus.CANCELLED,
-            ReservationStatus.EXPIRED,
           ],
         };
       }
@@ -746,11 +745,16 @@ export class ReservationsService {
       throw new ForbiddenException('Bạn chỉ có quyền chỉnh sửa đơn đặt chỗ thuộc cơ sở được phân công');
     }
 
-    // Status check
+    // Status check (cho phép Staff/Manager dời lịch đơn EXPIRED nếu có appointmentDate mới)
+    const isStaffRescheduleExpired =
+      reservation.status === ReservationStatus.EXPIRED &&
+      Boolean(dto.appointmentDate) &&
+      userRole !== UserRole.STORAGE_CUSTOMER;
+
     if (
       reservation.status === ReservationStatus.CANCELLED ||
       reservation.status === ReservationStatus.COMPLETED ||
-      reservation.status === ReservationStatus.EXPIRED
+      (reservation.status === ReservationStatus.EXPIRED && !isStaffRescheduleExpired)
     ) {
       throw new BadRequestException(
         `Cannot update reservation with status '${reservation.status}'`,
@@ -785,6 +789,7 @@ export class ReservationsService {
         rentalPeriod: dto.rentalPeriod || undefined,
         rentalPeriodUnit: dto.rentalPeriodUnit || undefined,
         totalAmount: dto.rentalPeriod ? totalAmount : undefined,
+        status: isStaffRescheduleExpired ? ReservationStatus.CONFIRMED : undefined,
       },
       include: {
         facility: {

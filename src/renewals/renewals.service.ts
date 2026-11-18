@@ -603,19 +603,17 @@ export class RenewalsService {
       const global = overduePolicies.find((p) => !p.facilityId);
       const chosen = specific || global || overduePolicies[0];
       const val: any = chosen?.value || {};
-      const gracePeriodDays = Number(
-        val.gracePeriodDays ?? val.grace_period_days ?? 7,
+      const liquidationThresholdDays = Number(
+        val.liquidationThresholdDays ?? val.gracePeriodDays ?? val.grace_period_days ?? 7,
       );
       const dailyFinePercent = Number(
         val.dailyFinePercent ?? val.daily_fine_rate ?? 1.5,
       );
-      const autoLockoutDays = Number(
-        val.autoLockoutDays ?? val.auto_lockout_days ?? 14,
-      );
       return {
-        gracePeriodDays: Number.isFinite(gracePeriodDays) ? Math.max(0, gracePeriodDays) : 7,
+        liquidationThresholdDays: Number.isFinite(liquidationThresholdDays)
+          ? Math.max(0, liquidationThresholdDays)
+          : 7,
         dailyFinePercent: Number.isFinite(dailyFinePercent) ? Math.max(0, dailyFinePercent) : 1.5,
-        autoLockoutDays: Number.isFinite(autoLockoutDays) ? Math.max(1, autoLockoutDays) : 14,
       };
     };
 
@@ -656,42 +654,28 @@ export class RenewalsService {
         newlyOverdueCount++;
       }
 
-      // 2. Tính toán số ngày quá hạn thực tế và ngày bị tính phạt (sau ân hạn)
+      // 2. Tính toán số ngày quá hạn thực tế: MỖI ngày trễ đều bị tính phạt theo % Ops Manager đặt;
+      //    quá liquidationThresholdDays mới chuyển sang diện Thanh lý kho
       const diffMs = now.getTime() - new Date(contract.endDate).getTime();
       const overdueDays = Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
-      const billableOverdueDays = Math.max(0, overdueDays - policy.gracePeriodDays);
+      const billableOverdueDays = overdueDays;
 
-      // 3. Chỉ khóa mã PIN Smart Lock (Overlock) khi đạt ngưỡng autoLockoutDays do Ops Manager cấu hình
-      if (overdueDays >= policy.autoLockoutDays) {
-        const lockResult = await this.prisma.contractItem.updateMany({
-          where: {
-            contractId: contract.id,
-            accessCodeStatus: AccessCodeStatus.ACTIVE,
-          },
-          data: {
-            accessCodeStatus: AccessCodeStatus.REVOKED,
-          },
-        });
-
-        if (lockResult.count > 0) {
-          lockedAccessCount += lockResult.count;
-          this.logger.warn(
-            `[LOCK ACCESS] Đã thu hồi quyền truy cập của ${lockResult.count} ngăn kho thuộc hợp đồng #${contract.contractCode} (quá hạn ${overdueDays}/${policy.autoLockoutDays} ngày)`,
-          );
-        }
+      // 3. Nếu vượt quá số ngày tối đa trước khi thanh lý -> ghi nhận hợp đồng đủ điều kiện thanh lý kho
+      if (overdueDays > policy.liquidationThresholdDays) {
+        this.logger.warn(
+          `[LIQUIDATION READY] Hợp đồng #${contract.contractCode} đã quá ${overdueDays}/${policy.liquidationThresholdDays} ngày chờ trước thanh lý -> Đủ điều kiện thanh lý kho.`,
+        );
       }
 
-      // 4. Tính tiền phạt quá hạn theo chính sách (% trên tiền thuê tháng * số ngày quá hạn sau ân hạn)
+      // 4. Tính tiền phạt quá hạn theo chính sách (% trên tiền thuê tháng * TỔNG số ngày trễ thực tế)
       const totalMonthlyRent = contract.contractItems.reduce(
         (sum, item) => sum + (Number(item.rentalPrice) || 0),
         0,
       );
 
-      // Nếu đang trong thời gian ân hạn (overdueDays <= gracePeriodDays), billableOverdueDays = 0 -> overdueFee = 0
-      const overdueFee =
-        billableOverdueDays > 0
-          ? Math.round(totalMonthlyRent * (policy.dailyFinePercent / 100) * billableOverdueDays)
-          : 0;
+      const overdueFee = Math.round(
+        totalMonthlyRent * (policy.dailyFinePercent / 100) * billableOverdueDays,
+      );
 
       // 5. Tạo hoặc cập nhật bản ghi OverdueRecord
       const openRecord = contract.overdueRecords[0];
