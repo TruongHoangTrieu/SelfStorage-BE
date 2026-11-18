@@ -114,4 +114,28 @@ export class ReservationsController {
   async expire(@Param('id') id: string) {
     return this.reservationsService.expireSingleReservation(id);
   }
+
+  @ApiOperation({ summary: 'Nhân viên gửi yêu cầu xin Quản lý cơ sở phê duyệt mở lại đơn nhận kho quá hạn (> 24h)' })
+  @ApiParam({ name: 'id', description: 'ID hoặc mã đơn đặt chỗ' })
+  @Post(':id/request-reopen')
+  @HttpCode(HttpStatus.OK)
+  async requestReopen(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body() body: { reason?: string; requestedBy?: string },
+  ) {
+    return this.reservationsService.requestManagerReopen(id, body, user);
+  }
+
+  @ApiOperation({ summary: 'Quản lý cơ sở phê duyệt hoặc từ chối mở lại đơn nhận kho quá hạn (> 24h)' })
+  @ApiParam({ name: 'id', description: 'ID hoặc mã đơn đặt chỗ' })
+  @Post(':id/review-reopen')
+  @HttpCode(HttpStatus.OK)
+  async reviewReopen(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body() body: { action: 'APPROVE' | 'REJECT'; reason?: string; managerName?: string },
+  ) {
+    return this.reservationsService.reviewManagerReopen(id, body, user);
+  }
 }

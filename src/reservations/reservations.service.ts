@@ -537,8 +537,10 @@ export class ReservationsService {
       }),
     ]);
 
+    const enrichedData = await this.attachManagerApprovalMetadata(data);
+
     return {
-      data,
+      data: enrichedData,
       pagination: {
         total,
         page,
@@ -546,6 +548,52 @@ export class ReservationsService {
         totalPages: Math.ceil(total / limit) || 1,
       },
     };
+  }
+
+  /**
+   * Đính kèm trạng thái phê duyệt mở lại đơn quá hạn từ MongoDB (ActivityLog) vào danh sách đơn đặt chỗ
+   */
+  private async attachManagerApprovalMetadata(reservations: any[]) {
+    if (!Array.isArray(reservations) || reservations.length === 0) {
+      return reservations;
+    }
+
+    const ids = reservations.map((r) => String(r.id));
+    const logs = await this.prisma.activityLog.findMany({
+      where: {
+        entityType: 'RESERVATION_REOPEN',
+        entityId: { in: ids },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (logs.length === 0) return reservations;
+
+    const latestByResId = new Map<string, any>();
+    for (const log of logs) {
+      if (log.entityId && !latestByResId.has(log.entityId)) {
+        try {
+          latestByResId.set(log.entityId, JSON.parse(log.description || '{}'));
+        } catch {
+          // ignore invalid json
+        }
+      }
+    }
+
+    return reservations.map((r) => {
+      const meta = latestByResId.get(String(r.id));
+      if (!meta) return r;
+      return {
+        ...r,
+        managerApprovalStatus: meta.status,
+        managerApprovalRequestedBy: meta.requestedBy,
+        managerApprovalRequestedAt: meta.requestedAt,
+        managerApprovalReason: meta.reason,
+        managerApproverName: meta.reviewedBy,
+        managerApprovedAt: meta.reviewedAt,
+        managerApprovedExpiry: meta.expiryIso,
+      };
+    });
   }
 
   /**
@@ -645,7 +693,8 @@ export class ReservationsService {
       reservation.status = ReservationStatus.EXPIRED;
     }
 
-    return reservation;
+    const [enriched] = await this.attachManagerApprovalMetadata([reservation]);
+    return enriched || reservation;
   }
 
   /**
@@ -970,5 +1019,238 @@ export class ReservationsService {
 
       return updated;
     });
+  }
+
+  /**
+   * Nhân viên lễ tân gửi yêu cầu xin Quản lý cơ sở duyệt mở lại đơn quá hạn (> 24h)
+   */
+  async requestManagerReopen(
+    idOrCode: string,
+    dto: { reason?: string; requestedBy?: string },
+    user?: any,
+  ) {
+    const isObjectId = /^[a-f\d]{24}$/i.test(idOrCode);
+    const reservation = await this.prisma.reservation.findFirst({
+      where: isObjectId
+        ? { OR: [{ id: idOrCode }, { reservationCode: idOrCode }] }
+        : { reservationCode: idOrCode },
+      include: { facility: true, customer: true },
+    });
+
+    if (!reservation) {
+      throw new NotFoundException(`Không tìm thấy đơn đặt chỗ '${idOrCode}'`);
+    }
+
+    const requestedBy = dto.requestedBy || user?.fullName || 'Nhân viên lễ tân';
+    const reason = dto.reason || 'Khách hàng liên hệ xin nhận kho bù trong ngày';
+    const requestedAt = new Date().toISOString();
+    const actorUserId = user?.id || reservation.customerId;
+
+    const approvalMeta = {
+      status: 'pending',
+      requestedBy,
+      requestedAt,
+      reason,
+    };
+
+    await this.prisma.activityLog.create({
+      data: {
+        userId: actorUserId,
+        action: 'REOPEN_REQUEST_PENDING',
+        entityType: 'RESERVATION_REOPEN',
+        entityId: reservation.id,
+        description: JSON.stringify(approvalMeta),
+      },
+    });
+
+    await this.notificationsService
+      .notifyFacilityStaff(
+        reservation.facilityId,
+        `Yêu cầu duyệt mở lại đơn quá hạn ${reservation.reservationCode}`,
+        `${requestedBy} vừa gửi tờ trình xin mở lại đơn ${reservation.reservationCode} (${reservation.customer?.fullName || 'Khách hàng'}): ${reason}`,
+        NotificationType.OVERDUE,
+        'RESERVATION',
+        reservation.id,
+        {
+          reservationId: reservation.id,
+          reservationCode: reservation.reservationCode,
+          managerApprovalStatus: 'pending',
+          requestedBy,
+          requestedAt,
+          reason,
+        },
+      )
+      .catch(() => {});
+
+    return {
+      ...reservation,
+      managerApprovalStatus: 'pending',
+      managerApprovalRequestedBy: requestedBy,
+      managerApprovalRequestedAt: requestedAt,
+      managerApprovalReason: reason,
+    };
+  }
+
+  /**
+   * Quản lý cơ sở phê duyệt (APPROVE) hoặc từ chối (REJECT) yêu cầu mở lại đơn quá hạn (> 24h)
+   */
+  async reviewManagerReopen(
+    idOrCode: string,
+    dto: { action: 'APPROVE' | 'REJECT'; reason?: string; managerName?: string },
+    user?: any,
+  ) {
+    const isObjectId = /^[a-f\d]{24}$/i.test(idOrCode);
+    const reservation = await this.prisma.reservation.findFirst({
+      where: isObjectId
+        ? { OR: [{ id: idOrCode }, { reservationCode: idOrCode }] }
+        : { reservationCode: idOrCode },
+      include: { items: true, facility: true, customer: true },
+    });
+
+    if (!reservation) {
+      throw new NotFoundException(`Không tìm thấy đơn đặt chỗ '${idOrCode}'`);
+    }
+
+    const managerName = dto.managerName || user?.fullName || 'Quản lý cơ sở';
+    const reason = dto.reason || 'Đồng ý mở lại đơn nhận kho đến 23:59 hôm nay';
+    const now = new Date();
+    const actorUserId = user?.id || reservation.customerId;
+
+    if (dto.action === 'APPROVE') {
+      const endOfDay = new Date(now);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      const approvalMeta = {
+        status: 'approved',
+        reviewedBy: managerName,
+        reviewedAt: now.toISOString(),
+        expiryIso: endOfDay.toISOString(),
+        reason,
+      };
+
+      const updated = await this.prisma.$transaction(async (tx) => {
+        for (const item of reservation.items) {
+          if (item.unitId) {
+            await tx.storageUnit.updateMany({
+              where: {
+                id: item.unitId,
+                status: StorageUnitStatus.AVAILABLE,
+              },
+              data: {
+                status: StorageUnitStatus.RESERVED,
+              },
+            });
+          }
+        }
+
+        await tx.activityLog.create({
+          data: {
+            userId: actorUserId,
+            action: 'REOPEN_REQUEST_APPROVED',
+            entityType: 'RESERVATION_REOPEN',
+            entityId: reservation.id,
+            description: JSON.stringify(approvalMeta),
+          },
+        });
+
+        return tx.reservation.update({
+          where: { id: reservation.id },
+          data: {
+            status: ReservationStatus.CONFIRMED,
+            appointmentDate: now,
+          },
+        });
+      });
+
+      await this.notificationsService
+        .notifyFacilityStaff(
+          reservation.facilityId,
+          `Đã duyệt mở lại đơn ${reservation.reservationCode}`,
+          `${managerName} đã phê duyệt mở lại đơn ${reservation.reservationCode} (hiệu lực đến 23:59 hôm nay).`,
+          NotificationType.SYSTEM,
+          'RESERVATION',
+          reservation.id,
+          {
+            reservationId: reservation.id,
+            reservationCode: reservation.reservationCode,
+            managerApprovalStatus: 'approved',
+            managerApproverName: managerName,
+            managerApprovedAt: now.toISOString(),
+            managerApprovedExpiry: endOfDay.toISOString(),
+            reason,
+          },
+        )
+        .catch(() => {});
+
+      return {
+        ...updated,
+        managerApprovalStatus: 'approved',
+        managerApproverName: managerName,
+        managerApprovedAt: now.toISOString(),
+        managerApprovedExpiry: endOfDay.toISOString(),
+        managerApprovalReason: reason,
+      };
+    } else {
+      const approvalMeta = {
+        status: 'rejected',
+        reviewedBy: managerName,
+        reviewedAt: now.toISOString(),
+        reason,
+      };
+
+      const updated = await this.prisma.$transaction(async (tx) => {
+        for (const item of reservation.items) {
+          if (item.unitId) {
+            await tx.storageUnit.updateMany({
+              where: {
+                id: item.unitId,
+                status: StorageUnitStatus.RESERVED,
+              },
+              data: {
+                status: StorageUnitStatus.AVAILABLE,
+              },
+            });
+          }
+        }
+
+        await tx.activityLog.create({
+          data: {
+            userId: actorUserId,
+            action: 'REOPEN_REQUEST_REJECTED',
+            entityType: 'RESERVATION_REOPEN',
+            entityId: reservation.id,
+            description: JSON.stringify(approvalMeta),
+          },
+        });
+
+        return tx.reservation.findUnique({ where: { id: reservation.id } });
+      });
+
+      await this.notificationsService
+        .notifyFacilityStaff(
+          reservation.facilityId,
+          `Từ chối mở lại đơn ${reservation.reservationCode}`,
+          `${managerName} đã từ chối mở lại đơn ${reservation.reservationCode}: ${reason}`,
+          NotificationType.SYSTEM,
+          'RESERVATION',
+          reservation.id,
+          {
+            reservationId: reservation.id,
+            reservationCode: reservation.reservationCode,
+            managerApprovalStatus: 'rejected',
+            managerApproverName: managerName,
+            reason,
+          },
+        )
+        .catch(() => {});
+
+      return {
+        ...updated,
+        managerApprovalStatus: 'rejected',
+        managerApproverName: managerName,
+        managerApprovedAt: now.toISOString(),
+        managerApprovalReason: reason,
+      };
+    }
   }
 }
