@@ -17,13 +17,20 @@ import { FilterRenewalDto } from './dto/filter-renewal.dto';
 import {
   FilterOverdueDto,
   ResolveOverdueDto,
+  RequestLiquidationDto,
+  CompleteLiquidationDto,
 } from './dto/filter-overdue.dto';
 import {
   ContractStatus,
+  ContractItemStatus,
   RenewalStatus,
   OverdueStatus,
   AccessCodeStatus,
   NotificationType,
+  HandoverType,
+  StorageUnitStatus,
+  ExtraChargeStatus,
+  Prisma,
 } from '@prisma/client';
 import { UserRole } from '../common/enums/role.enum';
 import { AiService } from '../ai/ai.service';
@@ -660,11 +667,24 @@ export class RenewalsService {
       const overdueDays = Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
       const billableOverdueDays = overdueDays;
 
-      // 3. Nếu vượt quá số ngày tối đa trước khi thanh lý -> ghi nhận hợp đồng đủ điều kiện thanh lý kho
+      // 3. Gửi thông báo theo mốc quá hạn (<= N ngày nhắc phạt, > N ngày báo diện thanh lý cho Khách & Manager)
+      const unitNames =
+        contract.contractItems.map((ci) => ci.unit?.unitNumber).filter(Boolean).join(', ') ||
+        contract.contractCode;
+
       if (overdueDays > policy.liquidationThresholdDays) {
         this.logger.warn(
           `[LIQUIDATION READY] Hợp đồng #${contract.contractCode} đã quá ${overdueDays}/${policy.liquidationThresholdDays} ngày chờ trước thanh lý -> Đủ điều kiện thanh lý kho.`,
         );
+        await this.sendOverdueLiquidationAlerts(
+          contract,
+          unitNames,
+          overdueDays,
+          policy.liquidationThresholdDays,
+          facId,
+        );
+      } else {
+        await this.sendOverdueReminderToCustomer(contract, unitNames, overdueDays);
       }
 
       // 4. Tính tiền phạt quá hạn theo chính sách (% trên tiền thuê tháng * TỔNG số ngày trễ thực tế)
@@ -747,7 +767,7 @@ export class RenewalsService {
       };
     }
 
-    const [total, data] = await Promise.all([
+    const [total, rawData, overduePolicies] = await Promise.all([
       this.prisma.overdueRecord.count({ where }),
       this.prisma.overdueRecord.findMany({
         where,
@@ -766,7 +786,9 @@ export class RenewalsService {
                     select: {
                       id: true,
                       unitNumber: true,
+                      facilityId: true,
                       facility: { select: { id: true, name: true } },
+                      unitType: { select: { id: true, name: true, size: true } },
                     },
                   },
                 },
@@ -778,7 +800,32 @@ export class RenewalsService {
           },
         },
       }),
+      this.prisma.policy.findMany({
+        where: { policyType: 'OVERDUE', status: 'ACTIVE' },
+        orderBy: { effectiveFrom: 'desc' },
+      }),
     ]);
+
+    const data = rawData.map((rec) => {
+      const facId = rec.contract?.contractItems?.[0]?.unit?.facilityId;
+      const pol =
+        (facId && overduePolicies.find((p) => p.facilityId === facId)) ||
+        overduePolicies.find((p) => !p.facilityId) ||
+        overduePolicies[0];
+      const val: any = pol?.value || {};
+      const liquidationThresholdDays = Number(
+        val.liquidationThresholdDays ?? val.gracePeriodDays ?? val.grace_period_days ?? 7,
+      );
+      const dailyFinePercent = Number(val.dailyFinePercent ?? val.daily_fine_rate ?? 1.5);
+      return {
+        ...rec,
+        daysOverdue: rec.overdueDays,
+        liquidationThresholdDays: Number.isFinite(liquidationThresholdDays)
+          ? Math.max(0, liquidationThresholdDays)
+          : 7,
+        dailyFinePercent: Number.isFinite(dailyFinePercent) ? Math.max(0, dailyFinePercent) : 1.5,
+      };
+    });
 
     return {
       data,
@@ -889,6 +936,498 @@ export class RenewalsService {
       message: 'Đã miễn giảm phí phạt quá hạn thành công',
       overdueRecord: updated,
       notes,
+    };
+  }
+
+  // =========================================================================
+  // 3. LUỒNG YÊU CẦU & THỰC HIỆN THANH LÝ KHO QUÁ HẠN (MANAGER -> STAFF)
+  // =========================================================================
+
+  private async getFacilityUsersByRoles(facilityId: string, roleNames: UserRole[]) {
+    const assignments = await this.prisma.staffFacilityAssignment.findMany({
+      where: {
+        facilityId,
+        user: {
+          role: { name: { in: roleNames } },
+        },
+      },
+      include: {
+        user: { select: { id: true, fullName: true, email: true, role: { select: { name: true } } } },
+      },
+    });
+    return assignments.filter((a) => !a.endedAt).map((a) => a.user);
+  }
+
+  private async sendOverdueReminderToCustomer(
+    contract: any,
+    unitNames: string,
+    overdueDays: number,
+  ) {
+    try {
+      const existing = await this.prisma.notification.findFirst({
+        where: {
+          userId: contract.customerId,
+          entityId: contract.id,
+          type: NotificationType.OVERDUE,
+          title: { contains: 'đã quá hạn' },
+        },
+      });
+      if (existing) return;
+      await this.notificationsService.create({
+        userId: contract.customerId,
+        type: NotificationType.OVERDUE,
+        title: `Ô kho #${unitNames} đã quá hạn ${overdueDays} ngày`,
+        body: `Hợp đồng #${contract.contractCode} đã quá hạn. Hệ thống đang tính phí phạt trễ hạn mỗi ngày. Vui lòng gia hạn hoặc làm thủ tục trả kho sớm để tránh bị thanh lý kho.`,
+        entityType: 'RENTAL_CONTRACT',
+        entityId: contract.id,
+        metadata: { phase: 'OVERDUE_REMINDER', contractCode: contract.contractCode, overdueDays },
+      });
+    } catch (err: any) {
+      this.logger.warn(`Failed to send overdue reminder: ${err?.message}`);
+    }
+  }
+
+  private async sendOverdueLiquidationAlerts(
+    contract: any,
+    unitNames: string,
+    overdueDays: number,
+    thresholdDays: number,
+    facilityId?: string,
+  ) {
+    try {
+      const existingCust = await this.prisma.notification.findFirst({
+        where: {
+          userId: contract.customerId,
+          entityId: contract.id,
+          type: NotificationType.OVERDUE,
+          title: { contains: 'thanh lý' },
+        },
+      });
+      if (!existingCust) {
+        await this.notificationsService.create({
+          userId: contract.customerId,
+          type: NotificationType.OVERDUE,
+          title: `Kho #${unitNames} đã quá hạn và chuyển sang diện thanh lý`,
+          body: `Hợp đồng #${contract.contractCode} đã quá hạn ${overdueDays} ngày (vượt ngưỡng ${thresholdDays} ngày quy định). Kho của bạn đã được chuyển sang diện thanh lý theo quy định.`,
+          entityType: 'RENTAL_CONTRACT',
+          entityId: contract.id,
+          metadata: { phase: 'LIQUIDATION_ELIGIBLE', contractCode: contract.contractCode, overdueDays },
+        });
+      }
+
+      if (facilityId) {
+        const managers = await this.getFacilityUsersByRoles(facilityId, [
+          UserRole.FACILITY_MANAGER,
+        ]);
+        for (const mgr of managers) {
+          const existingMgr = await this.prisma.notification.findFirst({
+            where: {
+              userId: mgr.id,
+              entityId: contract.id,
+              type: NotificationType.OVERDUE,
+              title: { contains: 'đủ điều kiện thanh lý' },
+            },
+          });
+          if (!existingMgr) {
+            await this.notificationsService.create({
+              userId: mgr.id,
+              type: NotificationType.OVERDUE,
+              title: `Kho quá hạn #${unitNames} đủ điều kiện thanh lý`,
+              body: `Hợp đồng #${contract.contractCode} của ${contract.customer?.fullName || 'khách hàng'} đã quá hạn ${overdueDays} ngày (> ${thresholdDays} ngày). Vui lòng xem xét và yêu cầu nhân viên thanh lý kho.`,
+              entityType: 'RENTAL_CONTRACT',
+              entityId: contract.id,
+              metadata: {
+                phase: 'LIQUIDATION_ELIGIBLE',
+                facilityId,
+                contractCode: contract.contractCode,
+                overdueDays,
+              },
+            });
+          }
+        }
+      }
+    } catch (err: any) {
+      this.logger.warn(`Failed to send liquidation alerts: ${err?.message}`);
+    }
+  }
+
+  /**
+   * Manager yêu cầu toàn bộ Staff chi nhánh thực hiện thanh lý kho quá hạn
+   * - Thu hồi ngay mã PIN Smart Lock của khách (REVOKED)
+   * - Đặt liquidationStatus = REQUESTED và gửi thông báo tới Staff chi nhánh & Khách
+   */
+  async requestLiquidation(id: string, user: any, dto: RequestLiquidationDto) {
+    const record = await this.prisma.overdueRecord.findUnique({
+      where: { id },
+      include: {
+        contract: {
+          include: {
+            customer: { select: { id: true, fullName: true, email: true, phone: true } },
+            reservation: {
+              select: {
+                facilityId: true,
+                facility: { select: { id: true, name: true } },
+              },
+            },
+            contractItems: {
+              include: {
+                unit: { select: { id: true, unitNumber: true, facilityId: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!record) {
+      throw new NotFoundException(`Bản ghi quá hạn #${id} không tồn tại`);
+    }
+    if (record.status !== OverdueStatus.OPEN) {
+      throw new BadRequestException(
+        `Không thể yêu cầu thanh lý vì hồ sơ quá hạn đã ở trạng thái '${record.status}'`,
+      );
+    }
+    if (record.liquidationStatus === 'REQUESTED') {
+      throw new BadRequestException('Hồ sơ này đã được gửi yêu cầu thanh lý cho nhân viên rồi.');
+    }
+
+    const facilityId =
+      record.contract.reservation?.facilityId ||
+      record.contract.contractItems?.[0]?.unit?.facilityId;
+
+    const userRole = typeof user.role === 'string' ? user.role : user.role?.name;
+    if (userRole === UserRole.FACILITY_MANAGER && user.facilityId && facilityId !== user.facilityId) {
+      throw new ForbiddenException('Bạn chỉ có thể yêu cầu thanh lý kho thuộc cơ sở mình quản lý');
+    }
+
+    const updatedRecord = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.overdueRecord.update({
+        where: { id },
+        data: {
+          liquidationStatus: 'REQUESTED',
+          liquidationRequestedBy: user.id,
+          liquidationRequestedAt: new Date(),
+          liquidationNotes:
+            dto.notes?.trim() ||
+            `Quản lý yêu cầu thanh lý kho quá hạn (${record.overdueDays} ngày)`,
+        },
+      });
+
+      // Thu hồi quyền truy cập Smart Lock của khách ngay lập tức
+      await tx.contractItem.updateMany({
+        where: { contractId: record.contractId },
+        data: { accessCodeStatus: AccessCodeStatus.REVOKED },
+      });
+
+      return updated;
+    });
+
+    const unitNames =
+      record.contract.contractItems.map((ci) => ci.unit?.unitNumber).filter(Boolean).join(', ') ||
+      record.contract.contractCode;
+
+    // Thông báo cho toàn bộ Staff thuộc chi nhánh & Khách hàng
+    if (facilityId) {
+      const staffList = await this.getFacilityUsersByRoles(facilityId, [
+        UserRole.FACILITY_STAFF,
+      ]);
+      for (const staff of staffList) {
+        await this.notificationsService
+          .create({
+            userId: staff.id,
+            type: NotificationType.OVERDUE,
+            title: `Yêu cầu thanh lý kho quá hạn #${unitNames}`,
+            body: `Quản lý yêu cầu thanh lý ô kho #${unitNames} (HĐ #${record.contract.contractCode}, quá hạn ${record.overdueDays} ngày). Vui lòng vào mục Thanh lý kho để kiểm kê và hoàn tất.`,
+            entityType: 'OVERDUE_LIQUIDATION',
+            entityId: record.id,
+            metadata: {
+              overdueRecordId: record.id,
+              contractId: record.contractId,
+              facilityId,
+              unitNumber: unitNames,
+            },
+          })
+          .catch(() => null);
+      }
+    }
+
+    await this.notificationsService
+      .create({
+        userId: record.contract.customerId,
+        type: NotificationType.OVERDUE,
+        title: `Kho #${unitNames} đang được tiến hành thanh lý`,
+        body: `Quản lý cơ sở đã kích hoạt lệnh thanh lý cho hợp đồng quá hạn #${record.contract.contractCode}. Mã PIN mở khóa đã được tạm khóa để nhân viên kiểm kê xử lý.`,
+        entityType: 'RENTAL_CONTRACT',
+        entityId: record.contractId,
+        metadata: { overdueRecordId: record.id, contractCode: record.contract.contractCode },
+      })
+      .catch(() => null);
+
+    return {
+      message: `Đã khóa PIN khách hàng và gửi lệnh thanh lý ô kho #${unitNames} cho nhân viên chi nhánh`,
+      overdueRecord: updatedRecord,
+    };
+  }
+
+  /**
+   * Lấy danh sách đơn Thanh lý kho cho nhân viên / quản lý chi nhánh
+   */
+  async getLiquidations(user: any, filterDto: FilterOverdueDto) {
+    const userRole = typeof user.role === 'string' ? user.role : user.role?.name;
+    const where: any = {
+      liquidationStatus: { in: ['REQUESTED', 'COMPLETED'] },
+    };
+
+    if (
+      (userRole === UserRole.FACILITY_STAFF || userRole === UserRole.FACILITY_MANAGER) &&
+      user.facilityId
+    ) {
+      where.contract = {
+        contractItems: {
+          some: { unit: { facilityId: user.facilityId } },
+        },
+      };
+    } else if (filterDto.facilityId) {
+      where.contract = {
+        contractItems: {
+          some: { unit: { facilityId: filterDto.facilityId } },
+        },
+      };
+    }
+
+    const records = await this.prisma.overdueRecord.findMany({
+      where,
+      orderBy: [{ liquidationStatus: 'desc' }, { liquidationRequestedAt: 'desc' }],
+      include: {
+        contract: {
+          include: {
+            customer: {
+              select: { id: true, fullName: true, email: true, phone: true },
+            },
+            reservation: {
+              select: {
+                facilityId: true,
+                facility: { select: { id: true, name: true, code: true } },
+              },
+            },
+            contractItems: {
+              include: {
+                unit: {
+                  include: {
+                    unitType: { select: { id: true, name: true, size: true } },
+                    facility: { select: { id: true, name: true } },
+                  },
+                },
+                handoverRecords: {
+                  where: { type: HandoverType.CHECK_IN },
+                  orderBy: { createdAt: 'desc' },
+                  take: 1,
+                },
+              },
+            },
+          },
+        },
+        resolver: {
+          select: { id: true, fullName: true, email: true },
+        },
+      },
+    });
+
+    return records;
+  }
+
+  /**
+   * Staff hoàn tất quy trình thanh lý kho quá hạn:
+   * - Kiểm kê chụp ảnh đồ tồn kho + đổi PIN Smart Lock mới
+   * - Tịch thu / cấn trừ toàn bộ tiền cọc vào tiền phạt (không hoàn cọc)
+   * - Giải phóng ô kho (AVAILABLE / UNDER_MAINTENANCE), đóng hợp đồng (TERMINATED) & OverdueRecord (RESOLVED)
+   */
+  async completeLiquidation(id: string, user: any, dto: CompleteLiquidationDto) {
+    const record = await this.prisma.overdueRecord.findUnique({
+      where: { id },
+      include: {
+        contract: {
+          include: {
+            customer: { select: { id: true, fullName: true, email: true, phone: true } },
+            reservation: {
+              select: {
+                facilityId: true,
+                facility: { select: { id: true, name: true } },
+              },
+            },
+            contractItems: {
+              include: {
+                unit: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!record) {
+      throw new NotFoundException(`Đơn thanh lý #${id} không tồn tại`);
+    }
+    if (record.liquidationStatus !== 'REQUESTED' || record.status !== OverdueStatus.OPEN) {
+      throw new BadRequestException(
+        'Đơn thanh lý này không ở trạng thái chờ nhân viên xử lý (REQUESTED)',
+      );
+    }
+
+    const facilityId =
+      record.contract.reservation?.facilityId ||
+      record.contract.contractItems?.[0]?.unit?.facilityId;
+    const userRole = typeof user.role === 'string' ? user.role : user.role?.name;
+    if (
+      (userRole === UserRole.FACILITY_STAFF || userRole === UserRole.FACILITY_MANAGER) &&
+      user.facilityId &&
+      facilityId !== user.facilityId
+    ) {
+      throw new ForbiddenException('Bạn không thuộc chi nhánh của đơn thanh lý này');
+    }
+
+    const cleanPin = dto.newAccessCode.trim();
+    const oldPins = record.contract.contractItems.map((ci) => ci.accessCode).filter(Boolean);
+    if (oldPins.includes(cleanPin)) {
+      throw new BadRequestException('Mã PIN mới không được trùng với mã PIN cũ của ô kho');
+    }
+
+    const totalDeposit = record.contract.contractItems.reduce(
+      (sum, ci) => sum + Number(ci.depositAmount || 0),
+      0,
+    );
+    const overdueFine = Number(record.overdueFee || 0);
+    const remainingDebt = Math.max(0, overdueFine - totalDeposit);
+    const targetUnitStatus = dto.unitCondition || StorageUnitStatus.AVAILABLE;
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const handoverNotes = [
+        `[BIÊN BẢN THANH LÝ KHO QUÁ HẠN] Quá hạn ${record.overdueDays} ngày.`,
+        dto.notes?.trim(),
+        `Đổi mã PIN mới: ${cleanPin}.`,
+        `Tịch thu & cấn trừ tiền cọc: ${totalDeposit.toLocaleString('vi-VN')} đ (Không hoàn cọc).`,
+        `Phạt quá hạn lũy tiến: ${overdueFine.toLocaleString('vi-VN')} đ.`,
+        remainingDebt > 0
+          ? `Công nợ còn lại sau cấn trừ cọc: ${remainingDebt.toLocaleString('vi-VN')} đ.`
+          : 'Đã cấn trừ hết trong tiền cọc.',
+      ]
+        .filter(Boolean)
+        .join(' ');
+
+      for (const item of record.contract.contractItems) {
+        await tx.handoverRecord.create({
+          data: {
+            contractItemId: item.id,
+            staffId: user.id,
+            type: HandoverType.CHECK_OUT,
+            condition: dto.condition,
+            notes: handoverNotes,
+            photos: dto.photos
+              ? (dto.photos as unknown as Prisma.InputJsonValue)
+              : null,
+            inspectionDate: new Date(),
+          },
+        });
+
+        await tx.contractItem.update({
+          where: { id: item.id },
+          data: {
+            status: ContractItemStatus.RETURNED,
+            accessCodeStatus: AccessCodeStatus.REVOKED,
+            accessCode: cleanPin,
+          },
+        });
+
+        await tx.storageUnit.update({
+          where: { id: item.unitId },
+          data: { status: targetUnitStatus },
+        });
+      }
+
+      if (overdueFine > 0) {
+        const feeType = await tx.feeType.findFirst({ where: { status: 'ACTIVE' } });
+        if (feeType) {
+          await tx.extraCharge.create({
+            data: {
+              contractId: record.contractId,
+              feeTypeId: feeType.id,
+              amount: overdueFine,
+              reason: `Thanh lý kho quá hạn (${record.overdueDays} ngày) - Cấn trừ tiền cọc ${totalDeposit.toLocaleString('vi-VN')} đ`,
+              status: ExtraChargeStatus.PAID,
+              createdBy: user.id,
+            },
+          });
+        }
+      }
+
+      const updatedOverdue = await tx.overdueRecord.update({
+        where: { id },
+        data: {
+          status: OverdueStatus.RESOLVED,
+          liquidationStatus: 'COMPLETED',
+          resolvedBy: user.id,
+          resolvedAt: new Date(),
+          liquidationCondition: dto.condition,
+          liquidationPhotos: dto.photos
+            ? (dto.photos as unknown as Prisma.InputJsonValue)
+            : null,
+          liquidationNewPin: cleanPin,
+          liquidationForfeitedDeposit: totalDeposit,
+          liquidationRemainingDebt: remainingDebt,
+        },
+      });
+
+      const updatedContract = await tx.rentalContract.update({
+        where: { id: record.contractId },
+        data: { status: ContractStatus.TERMINATED },
+      });
+
+      return { updatedOverdue, updatedContract };
+    });
+
+    const unitNames =
+      record.contract.contractItems.map((ci) => ci.unit?.unitNumber).filter(Boolean).join(', ') ||
+      record.contract.contractCode;
+
+    // Gửi thông báo cho Khách hàng và Manager chi nhánh
+    await this.notificationsService
+      .create({
+        userId: record.contract.customerId,
+        type: NotificationType.OVERDUE,
+        title: `Đã hoàn tất thanh lý ô kho #${unitNames}`,
+        body: `Hợp đồng quá hạn #${record.contract.contractCode} đã được thanh lý. Tiền cọc (${totalDeposit.toLocaleString('vi-VN')} đ) đã được cấn trừ vào phí phạt trễ hạn và ô kho đã được thu hồi.`,
+        entityType: 'RENTAL_CONTRACT',
+        entityId: record.contractId,
+        metadata: { overdueRecordId: record.id, contractCode: record.contract.contractCode },
+      })
+      .catch(() => null);
+
+    if (facilityId) {
+      const managers = await this.getFacilityUsersByRoles(facilityId, [
+        UserRole.FACILITY_MANAGER,
+      ]);
+      for (const mgr of managers) {
+        await this.notificationsService
+          .create({
+            userId: mgr.id,
+            type: NotificationType.OVERDUE,
+            title: `Nhân viên đã hoàn tất thanh lý kho #${unitNames}`,
+            body: `${user.fullName || 'Nhân viên'} đã hoàn tất kiểm kê, đổi PIN và thu hồi ô kho #${unitNames} (HĐ #${record.contract.contractCode}).`,
+            entityType: 'OVERDUE_LIQUIDATION',
+            entityId: record.id,
+            metadata: { overdueRecordId: record.id, facilityId, unitNumber: unitNames },
+          })
+          .catch(() => null);
+      }
+    }
+
+    return {
+      message: `Đã hoàn tất thanh lý ô kho #${unitNames}`,
+      overdueRecord: result.updatedOverdue,
+      contract: result.updatedContract,
+      forfeitedDeposit: totalDeposit,
+      overdueFine,
+      remainingDebt,
     };
   }
 }

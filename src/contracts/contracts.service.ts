@@ -87,6 +87,18 @@ export class ContractsService {
     return this.prisma.rentalContract.findMany({
       where: { customerId: userId },
       include: {
+        overdueRecords: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: {
+            id: true,
+            status: true,
+            overdueDays: true,
+            overdueFee: true,
+            liquidationStatus: true,
+            liquidationRequestedAt: true,
+          },
+        },
         contractItems: {
           include: {
             unit: {

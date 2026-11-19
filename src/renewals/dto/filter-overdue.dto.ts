@@ -1,7 +1,16 @@
-import { IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import {
+  IsArray,
+  IsEnum,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Matches,
+  Min,
+} from 'class-validator';
 import { Type } from 'class-transformer';
-import { ApiPropertyOptional } from '@nestjs/swagger';
-import { OverdueStatus } from '@prisma/client';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { OverdueStatus, StorageUnitStatus } from '@prisma/client';
 
 export class FilterOverdueDto {
   @ApiPropertyOptional({
@@ -58,4 +67,57 @@ export class ResolveOverdueDto {
   @IsInt()
   @Min(1)
   extendMonths?: number;
+}
+
+export class RequestLiquidationDto {
+  @ApiPropertyOptional({
+    description: 'Ghi chú / chỉ đạo của Quản lý gửi nhân viên khi yêu cầu thanh lý kho',
+    example: 'Hợp đồng quá hạn > 7 ngày, tiến hành kiểm kê đồ tồn và thu hồi ô kho.',
+  })
+  @IsOptional()
+  @IsString()
+  notes?: string;
+}
+
+export class CompleteLiquidationDto {
+  @ApiProperty({
+    description: 'Hiện trạng kho và tài sản tồn đọng khi kiểm kê thanh lý',
+    example: 'Đã kiểm kê và đóng gói đồ đạc tồn kho, niêm phong bàn giao xử lý.',
+  })
+  @IsString()
+  @IsNotEmpty({ message: 'Vui lòng mô tả hiện trạng kiểm kê khi thanh lý' })
+  condition: string;
+
+  @ApiPropertyOptional({
+    description: 'Ghi chú bổ sung trong biên bản thanh lý kho',
+  })
+  @IsOptional()
+  @IsString()
+  notes?: string;
+
+  @ApiPropertyOptional({
+    description: 'Danh sách URL ảnh chụp đồ đạc tồn kho và hiện trạng ô kho khi thanh lý',
+  })
+  @IsOptional()
+  @IsArray()
+  photos?: string[];
+
+  @ApiProperty({
+    description: 'Mã PIN Smart Lock mới gồm 6 chữ số để đặt lại cho ô kho',
+    example: '593812',
+  })
+  @IsString()
+  @Matches(/^\d{6}$/, { message: 'Mã PIN mới phải gồm đúng 6 chữ số' })
+  newAccessCode: string;
+
+  @ApiPropertyOptional({
+    description: 'Trạng thái ô kho sau khi thanh lý (AVAILABLE hoặc UNDER_MAINTENANCE)',
+    enum: StorageUnitStatus,
+    default: StorageUnitStatus.AVAILABLE,
+  })
+  @IsOptional()
+  @IsEnum(StorageUnitStatus, {
+    message: 'unitCondition phải là AVAILABLE hoặc UNDER_MAINTENANCE',
+  })
+  unitCondition?: StorageUnitStatus;
 }

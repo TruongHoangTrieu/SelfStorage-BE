@@ -28,6 +28,8 @@ import { FilterRenewalDto } from './dto/filter-renewal.dto';
 import {
   FilterOverdueDto,
   ResolveOverdueDto,
+  RequestLiquidationDto,
+  CompleteLiquidationDto,
 } from './dto/filter-overdue.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -214,5 +216,57 @@ export class RenewalsController {
     @Body('notes') notes?: string,
   ) {
     return this.renewalsService.waiveOverdue(id, user, notes);
+  }
+
+  @ApiOperation({
+    summary: 'Manager yêu cầu nhân viên thanh lý kho quá hạn (Khóa PIN khách & gửi lệnh cho Staff chi nhánh)',
+  })
+  @Roles(
+    UserRole.FACILITY_MANAGER,
+    UserRole.BUSINESS_OPERATIONS_MANAGER,
+    UserRole.SYSTEM_ADMINISTRATOR,
+  )
+  @Post('overdue/records/:id/request-liquidation')
+  async requestLiquidation(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body() dto: RequestLiquidationDto,
+  ) {
+    return this.renewalsService.requestLiquidation(id, user, dto);
+  }
+
+  @ApiOperation({
+    summary: 'Danh sách đơn thanh lý kho quá hạn cho Staff / Manager chi nhánh',
+  })
+  @Roles(
+    UserRole.FACILITY_STAFF,
+    UserRole.FACILITY_MANAGER,
+    UserRole.BUSINESS_OPERATIONS_MANAGER,
+    UserRole.SYSTEM_ADMINISTRATOR,
+  )
+  @Get('overdue/liquidations')
+  async getLiquidations(
+    @CurrentUser() user: any,
+    @Query() filterDto: FilterOverdueDto,
+  ) {
+    return this.renewalsService.getLiquidations(user, filterDto);
+  }
+
+  @ApiOperation({
+    summary: 'Staff hoàn tất thanh lý kho quá hạn (Kiểm kê ảnh, đổi PIN, tịch thu cọc & giải phóng kho)',
+  })
+  @Roles(
+    UserRole.FACILITY_STAFF,
+    UserRole.FACILITY_MANAGER,
+    UserRole.BUSINESS_OPERATIONS_MANAGER,
+    UserRole.SYSTEM_ADMINISTRATOR,
+  )
+  @Post('overdue/records/:id/complete-liquidation')
+  async completeLiquidation(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body() dto: CompleteLiquidationDto,
+  ) {
+    return this.renewalsService.completeLiquidation(id, user, dto);
   }
 }

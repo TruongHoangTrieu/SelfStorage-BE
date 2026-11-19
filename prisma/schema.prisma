@@ -724,16 +724,25 @@ model ContractRenewal {
 // ==========================================
 
 model OverdueRecord {
-  id               String        @id @default(auto()) @map("_id") @db.ObjectId
-  contractId       String        @db.ObjectId @map("contract_id")
-  overdueStartDate DateTime      @map("overdue_start_date")
-  overdueDays      Int           @map("overdue_days")
-  overdueFee       Float         @map("overdue_fee")
-  status           OverdueStatus @default(OPEN) @map("status")
-  resolvedBy       String?       @db.ObjectId @map("resolved_by")
-  resolvedAt       DateTime?     @map("resolved_at")
-  createdAt        DateTime      @default(now()) @map("created_at")
-  updatedAt        DateTime      @updatedAt @map("updated_at")
+  id                         String        @id @default(auto()) @map("_id") @db.ObjectId
+  contractId                 String        @db.ObjectId @map("contract_id")
+  overdueStartDate           DateTime      @map("overdue_start_date")
+  overdueDays                Int           @map("overdue_days")
+  overdueFee                 Float         @map("overdue_fee")
+  status                     OverdueStatus @default(OPEN) @map("status")
+  resolvedBy                 String?       @db.ObjectId @map("resolved_by")
+  resolvedAt                 DateTime?     @map("resolved_at")
+  liquidationStatus          String?       @map("liquidation_status")
+  liquidationRequestedBy     String?       @db.ObjectId @map("liquidation_requested_by")
+  liquidationRequestedAt     DateTime?     @map("liquidation_requested_at")
+  liquidationNotes           String?       @map("liquidation_notes")
+  liquidationCondition       String?       @map("liquidation_condition")
+  liquidationPhotos          Json?         @map("liquidation_photos")
+  liquidationNewPin          String?       @map("liquidation_new_pin")
+  liquidationForfeitedDeposit Float?       @map("liquidation_forfeited_deposit")
+  liquidationRemainingDebt   Float?        @map("liquidation_remaining_debt")
+  createdAt                  DateTime      @default(now()) @map("created_at")
+  updatedAt                  DateTime      @updatedAt @map("updated_at")
 
   contract RentalContract @relation(fields: [contractId], references: [id])
   resolver User?          @relation("ResolvedOverdues", fields: [resolvedBy], references: [id])
